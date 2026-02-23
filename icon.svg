@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0f172a"/>
+  <!-- Sailboat Base -->
+  <path d="M120 380 Q256 450 392 380 L320 320 L192 320 Z" fill="#0284c7"/>
+  <!-- Sails -->
+  <path d="M256 100 L256 300 L140 300 Z" fill="#e2e8f0"/>
+  <path d="M276 130 L370 300 L276 300 Z" fill="#94a3b8"/>
+  <!-- Shark Fin -->
+  <path d="M50 450 Q120 400 150 450 Z" fill="#ef4444"/>
+</svg>
