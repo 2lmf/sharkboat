@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SharkSail</title>
+    <title>SharkBoat</title>
 
     <!-- PWA Meta & Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -35,10 +35,16 @@
 
         <!-- Header / Top Bar -->
         <header class="top-bar">
-            <div class="logo">
-                <i class="fa-solid fa-anchor"></i>
-                <h1>SharkSail</h1>
+            <div class="logo" style="visibility: hidden;">
+                <h1>SharkBoat</h1>
             </div>
+
+            <!-- CENTRAL LOGO -->
+            <div class="center-logo"
+                style="position: absolute; left: 50%; transform: translateX(-50%); pointer-events: auto;">
+                <img src="logo.png" alt="SharpShark" style="height: 60px; object-fit: contain;">
+            </div>
+
             <div class="header-controls">
                 <button id="theme-toggle" class="icon-btn" aria-label="Toggle Night Mode">
                     <i class="fa-solid fa-moon"></i>

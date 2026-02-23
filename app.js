@@ -60,7 +60,13 @@ const DOM = {
     btnCloseLocation: document.getElementById('btn-close-location'),
     btnSaveLocationConfirm: document.getElementById('btn-save-location-confirm'),
     locCamera: document.getElementById('loc-camera'),
-    locPreviewImg: document.getElementById('loc-preview-img')
+    locPreviewImg: document.getElementById('loc-preview-img'),
+
+    // Fuel Logging Tools
+    btnLogFuel: document.getElementById('btn-log-fuel'),
+    btnCloseFuel: document.getElementById('btn-close-fuel'),
+    btnSaveFuel: document.getElementById('btn-save-fuel'),
+    fuelModal: document.getElementById('fuel-modal')
 };
 
 // ===== DATA STORAGE (DUAL LOCAL/SHEETS BACKEND) =====
