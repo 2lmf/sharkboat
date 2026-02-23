@@ -1,10 +1,51 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0f172a"/>
-  <!-- Sailboat Base -->
-  <path d="M120 380 Q256 450 392 380 L320 320 L192 320 Z" fill="#0284c7"/>
-  <!-- Sails -->
-  <path d="M256 100 L256 300 L140 300 Z" fill="#e2e8f0"/>
-  <path d="M276 130 L370 300 L276 300 Z" fill="#94a3b8"/>
-  <!-- Shark Fin -->
-  <path d="M50 450 Q120 400 150 450 Z" fill="#ef4444"/>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="sea" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg)" rx="110"/>
+  
+  <!-- Moon/Sun -->
+  <circle cx="256" cy="180" r="100" fill="#f59e0b" opacity="0.8"/>
+  
+  <!-- Sea -->
+  <path d="M0 320 Q 128 300 256 320 T 512 320 L 512 512 L 0 512 Z" fill="url(#sea)"/>
+  <path d="M0 350 Q 128 380 256 350 T 512 350 L 512 512 L 0 512 Z" fill="#0c4a6e" opacity="0.5"/>
+  
+  <!-- Boat Hull -->
+  <path d="M 80 340 L 320 340 L 360 280 L 50 280 Z" fill="#e2e8f0"/>
+  <!-- Boat trim -->
+  <path d="M 80 340 L 320 340 L 330 320 L 65 320 Z" fill="#0ea5e9"/>
+  <!-- Boat cabin / console -->
+  <path d="M 120 280 L 120 220 L 180 220 L 180 280 Z" fill="#cbd5e1"/>
+  <path d="M 110 210 L 190 210 L 190 220 L 110 220 Z" fill="#334155"/>
+  
+  <!-- Fisherman Body -->
+  <path d="M 260 280 L 260 210 Q 260 190 275 190 L 290 190 L 290 280 Z" fill="#f97316"/>
+  <!-- Fisherman Head -->
+  <circle cx="275" cy="170" r="15" fill="#fcd34d"/>
+  <!-- Hat -->
+  <path d="M 250 160 Q 275 140 300 160" stroke="#f59e0b" stroke-width="8" stroke-linecap="round" fill="none"/>
+  
+  <!-- Arms -->
+  <path d="M 275 210 L 330 200 L 360 170" stroke="#f97316" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Fishing Rod -->
+  <path d="M 290 240 L 480 50" stroke="#e2e8f0" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Fishing Line -->
+  <path d="M 480 50 Q 500 200 460 380" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+  
+  <!-- Fish on line -->
+  <path d="M 460 380 Q 420 370 440 400 Q 460 420 470 395" fill="#38bdf8"/>
+  <path d="M 470 395 L 485 405 L 480 390 Z" fill="#38bdf8"/>
+  
 </svg>
