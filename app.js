@@ -102,6 +102,47 @@ async function fetchLogsFromSheets(type) {
     }
 }
 
+// Sinkronizacija custom lokacija s Clouda na Mobitel
+async function syncLocations() {
+    if (!config.GAS_URL || config.GAS_URL.includes('VAŠ')) return;
+    try {
+        const serverSpots = await fetchLogsFromSheets('locations');
+        if (!serverSpots || serverSpots.length === 0) return;
+
+        const localSpots = getLogs('sharksail_custom_spots');
+        let updated = false;
+
+        serverSpots.forEach(s => {
+            const exists = localSpots.find(l =>
+                l.name === s.name &&
+                Math.abs(l.coords[0] - parseFloat(s.lat)) < 0.001 &&
+                Math.abs(l.coords[1] - parseFloat(s.lng)) < 0.001
+            );
+
+            if (!exists) {
+                localSpots.push({
+                    name: s.name,
+                    category: s.category || 'fishing',
+                    coords: [parseFloat(s.lat), parseFloat(s.lng)],
+                    image: null
+                });
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            localStorage.setItem('sharksail_custom_spots', JSON.stringify(localSpots));
+            renderSavedLocations();
+            const listEl = document.getElementById('custom-locations-list');
+            if (listEl && listEl.innerHTML !== '') {
+                renderLocationsList();
+            }
+        }
+    } catch (e) {
+        console.error("Error syncing locations from Sheets", e);
+    }
+}
+
 async function saveRouteLog(distanceNM, distanceKM, startTime) {
     if (distanceNM < 0.1) return; // Don't save empty/accidental trips
 
@@ -835,6 +876,7 @@ function confirmSaveLocation() {
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initGPS();
+    syncLocations();
 
     DOM.themeToggle.addEventListener('click', toggleTheme);
     DOM.speedUnitToggle.addEventListener('click', toggleSpeedUnit);

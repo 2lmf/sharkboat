@@ -38,20 +38,24 @@ function doPost(e) {
   }
 
   if (action === 'logLocation') {
-    var sheet = ss.getSheetByName('Lokacije');
-    if(!sheet) sheet = ss.insertSheet('Lokacije');
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["ID", "Datum", "Naziv", "Kategorija", "Lat", "Lng"]);
+    try {
+      var sheet = ss.getSheetByName('Lokacije');
+      if(!sheet) sheet = ss.insertSheet('Lokacije');
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(["ID", "Datum", "Naziv", "Kategorija", "Lat", "Lng"]);
+      }
+      sheet.appendRow([
+        e.parameter.id,
+        e.parameter.date,
+        e.parameter.name,
+        e.parameter.category,
+        e.parameter.lat,
+        e.parameter.lng
+      ]);
+      return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": err.toString()})).setMimeType(ContentService.MimeType.JSON);
     }
-    sheet.appendRow([
-      e.parameter.id,
-      e.parameter.date,
-      e.parameter.name,
-      e.parameter.category,
-      e.parameter.lat,
-      e.parameter.lng
-    ]);
-    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
   }
 
   return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
@@ -60,8 +64,13 @@ function doPost(e) {
 function doGet(e) {
   var sheetId = '15FxPpMR_USGUAGE-Ap1i1FD7uYo4wajTPl7wKZPj3fY';
   var ss = SpreadsheetApp.openById(sheetId);
-  var type = e.parameter.type; // 'routes' or 'fuel'
-  var sheetName = type === 'routes' ? 'Rute' : 'Gorivo';
+  var type = e.parameter.type; // 'routes', 'fuel', or 'locations'
+  
+  var sheetName = '';
+  if (type === 'routes') sheetName = 'Rute';
+  else if (type === 'fuel') sheetName = 'Gorivo';
+  else if (type === 'locations') sheetName = 'Lokacije';
+  
   var sheet = ss.getSheetByName(sheetName);
   
   if (!sheet) {
@@ -83,7 +92,7 @@ function doGet(e) {
             distanceKM: data[i][5]
          });
        }
-    } else {
+    } else if (type === 'fuel') {
         for(var i=1; i<data.length; i++) {
          result.push({
             id: data[i][0],
@@ -92,6 +101,17 @@ function doGet(e) {
             price: data[i][3],
             distSince: data[i][4],
             efficiency: data[i][5]
+         });
+       }
+    } else if (type === 'locations') {
+        for(var i=1; i<data.length; i++) {
+         result.push({
+            id: data[i][0],
+            date: data[i][1],
+            name: data[i][2],
+            category: data[i][3],
+            lat: data[i][4],
+            lng: data[i][5]
          });
        }
     }
