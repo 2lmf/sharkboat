@@ -76,6 +76,10 @@
             <button class="tool-btn primary" id="btn-locate" aria-label="Pronađi me">
                 <i class="fa-solid fa-location-crosshairs"></i>
             </button>
+            <button class="tool-btn accent" id="btn-save-loc" aria-label="Spremi trenutnu lokaciju"
+                style="margin-top: 10px; background-color: var(--accent);">
+                <i class="fa-solid fa-map-pin"></i>
+            </button>
         </div>
 
         <!-- Bottom Dashboard Panel -->
@@ -182,6 +186,61 @@
                             target="_blank" class="action-btn alt">Aladin Vjetar <i
                                 class="fa-solid fa-arrow-up-right-from-square"></i></a>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Location Modal -->
+        <div class="modal-overlay" id="location-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-map-pin"></i> Spremi Poziciju</h2>
+                    <button class="close-btn" id="btn-close-location"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label for="loc-name">NAZIV LOKACIJE</label>
+                        <input type="text" id="loc-name" placeholder="npr. Skrivena Uvala">
+                    </div>
+                    <div class="input-group">
+                        <label>KATEGORIJA</label>
+                        <div class="category-options" style="display: flex; gap: 10px; margin-top: 5px;">
+                            <label
+                                style="flex: 1; text-align: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);">
+                                <input type="radio" name="loc-category" value="beach" checked style="display:none;">
+                                <i class="fa-solid fa-umbrella-beach"
+                                    style="font-size: 24px; color: var(--accent); margin-bottom: 5px; display:block;"></i>
+                                Plaža
+                            </label>
+                            <label
+                                style="flex: 1; text-align: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);">
+                                <input type="radio" name="loc-category" value="fishing" style="display:none;">
+                                <i class="fa-solid fa-fish"
+                                    style="font-size: 24px; color: var(--danger); margin-bottom: 5px; display:block;"></i>
+                                Ribolov
+                            </label>
+                            <label
+                                style="flex: 1; text-align: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);">
+                                <input type="radio" name="loc-category" value="anchor" style="display:none;">
+                                <i class="fa-solid fa-anchor"
+                                    style="font-size: 24px; color: #a1a1aa; margin-bottom: 5px; display:block;"></i>
+                                Sidrište
+                            </label>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>FOTOGRAFIJA (OPCIONALNO)</label>
+                        <label for="loc-camera" class="action-btn alt"
+                            style="display:block; text-align:center; cursor:pointer;">
+                            <i class="fa-solid fa-camera"></i> Kamerica / Galerija
+                        </label>
+                        <input type="file" id="loc-camera" accept="image/*" capture="environment" style="display:none;">
+                        <img id="loc-preview-img" src=""
+                            style="display:none; width:100%; margin-top:10px; border-radius:8px; object-fit:cover; max-height:200px;">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-save" id="btn-save-location-confirm">Spremi Poziciju</button>
                 </div>
             </div>
         </div>

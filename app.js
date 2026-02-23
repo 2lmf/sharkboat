@@ -52,7 +52,15 @@ const DOM = {
 
     btnWeather: document.getElementById('btn-weather'),
     btnCloseWeather: document.getElementById('btn-close-weather'),
-    weatherModal: document.getElementById('weather-modal')
+    weatherModal: document.getElementById('weather-modal'),
+
+    // Location Save Tools
+    btnSaveLoc: document.getElementById('btn-save-loc'),
+    locationModal: document.getElementById('location-modal'),
+    btnCloseLocation: document.getElementById('btn-close-location'),
+    btnSaveLocationConfirm: document.getElementById('btn-save-location-confirm'),
+    locCamera: document.getElementById('loc-camera'),
+    locPreviewImg: document.getElementById('loc-preview-img')
 };
 
 // ===== DATA STORAGE (DUAL LOCAL/SHEETS BACKEND) =====
@@ -467,6 +475,22 @@ function toggleFishingMode() {
             popupAnchor: [0, -24]
         });
 
+        const beachIcon = L.divIcon({
+            html: '<i class="fa-solid fa-umbrella-beach" style="color:var(--accent); font-size:24px; text-shadow: 0 0 3px white;"></i>',
+            className: 'dummy-beach',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -24]
+        });
+
+        const anchorIcon = L.divIcon({
+            html: '<i class="fa-solid fa-anchor" style="color:#a1a1aa; font-size:24px; text-shadow: 0 0 3px white;"></i>',
+            className: 'dummy-anchor',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -24]
+        });
+
         // 1. Add "Internet" markers
         globalFishingSpots.forEach(spot => {
             L.marker(spot.coords, { icon: publicFishIcon })
@@ -477,14 +501,24 @@ function toggleFishingMode() {
         // 2. Add local custom markers
         const customSpots = getLogs('sharksail_custom_spots');
         customSpots.forEach(spot => {
-            L.marker(spot.coords, { icon: customFishIcon })
-                .bindPopup(`<b>${spot.name}</b><br><small>Osobna pošta</small>`)
+            let icon = customFishIcon;
+            let label = "Osobna pošta";
+            if (spot.category === 'beach') { icon = beachIcon; label = "Plaža"; }
+            if (spot.category === 'anchor') { icon = anchorIcon; label = "Sidrište"; }
+
+            let popupHtml = `<b>${spot.name}</b><br><small>${label}</small>`;
+            if (spot.image) {
+                popupHtml += `<br><img src="${spot.image}" style="width:100%; max-height:150px; border-radius:8px; margin-top:5px; object-fit:cover;">`;
+            }
+
+            L.marker(spot.coords, { icon: icon })
+                .bindPopup(popupHtml)
                 .addTo(fishingLayer);
         });
 
         // Find user pos or center
         if (userMarker) {
-            alert(`Prikazujem ribolovne pošte (Javne i Osobne). \n\nDugi klik na kartu za dodavanje nove pošte!`);
+            alert(`Prikazuju se lokacije (Plaže, sidrišta, pošte). \n\nDugi klik na kartu za dodavanje nove pošte ručno!`);
         }
     }
 }
@@ -492,12 +526,14 @@ function toggleFishingMode() {
 // Add map contextmenu (right click on pc, long press on mobile) for custom spots
 map.on('contextmenu', function (e) {
     if (state.mapMode === 'fishing') {
-        const spotName = prompt("Unesite naziv nove pošte:");
+        const spotName = prompt("Unesite naziv nove pozicije/pošte:");
         if (spotName) {
             const currentSpots = getLogs('sharksail_custom_spots');
             currentSpots.push({
                 name: spotName,
-                coords: [e.latlng.lat, e.latlng.lng]
+                coords: [e.latlng.lat, e.latlng.lng],
+                category: 'fishing',
+                image: null
             });
             localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
 
@@ -651,6 +687,71 @@ function closeWeather() {
     DOM.weatherModal.classList.remove('active');
 }
 
+// ===== SAVE LOCATION MODAL LOGIC =====
+let tempSavePos = null;
+let currentLocBase64 = null;
+
+function openLocationModal() {
+    // Use current GPS if available, otherwise map center
+    if (state.gps.connected && state.trip.lastPosition) {
+        tempSavePos = state.trip.lastPosition;
+    } else {
+        tempSavePos = map.getCenter();
+        alert("Oprez: Niste povezani na GPS. Spremamo središte trenutnog prikaza karte umjesto stvarne pozicije.");
+    }
+
+    currentLocBase64 = null;
+    document.getElementById('loc-name').value = '';
+    DOM.locPreviewImg.style.display = 'none';
+    DOM.locPreviewImg.src = '';
+
+    // Default to 'beach'
+    const beachRadio = document.querySelector('input[name="loc-category"][value="beach"]');
+    if (beachRadio) beachRadio.checked = true;
+
+    DOM.locationModal.classList.add('active');
+}
+
+function handlePhotoCapture(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            currentLocBase64 = event.target.result;
+            DOM.locPreviewImg.src = currentLocBase64;
+            DOM.locPreviewImg.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function confirmSaveLocation() {
+    const nameInput = document.getElementById('loc-name').value.trim();
+    const name = nameInput || "Nova Pozicija";
+
+    const categoryEl = document.querySelector('input[name="loc-category"]:checked');
+    const category = categoryEl ? categoryEl.value : 'fishing';
+
+    const currentSpots = getLogs('sharksail_custom_spots');
+    currentSpots.push({
+        name: name,
+        coords: [tempSavePos.lat, tempSavePos.lng],
+        category: category,
+        image: currentLocBase64
+    });
+    localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
+
+    DOM.locationModal.classList.remove('active');
+    alert("Pozicija uspješno spremljena!");
+
+    // Refresh map markers if needed
+    if (state.mapMode === 'fishing') {
+        toggleFishingMode();
+        toggleFishingMode();
+    }
+}
+
+
 
 // ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -674,4 +775,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     DOM.btnCloseLogbook.addEventListener('click', closeLogbook);
     DOM.btnCloseWeather.addEventListener('click', closeWeather);
+
+    DOM.btnSaveLoc.addEventListener('click', openLocationModal);
+    DOM.btnCloseLocation.addEventListener('click', () => DOM.locationModal.classList.remove('active'));
+    DOM.locCamera.addEventListener('change', handlePhotoCapture);
+    DOM.btnSaveLocationConfirm.addEventListener('click', confirmSaveLocation);
 });
