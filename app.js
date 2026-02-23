@@ -54,6 +54,11 @@ const DOM = {
     btnCloseWeather: document.getElementById('btn-close-weather'),
     weatherModal: document.getElementById('weather-modal'),
 
+    // Locations List Modal
+    btnLocationsList: document.getElementById('btn-locations-list'),
+    btnCloseLocationsList: document.getElementById('btn-close-locations-list'),
+    locationsListModal: document.getElementById('locations-list-modal'),
+
     // Location Save Tools
     btnSaveLoc: document.getElementById('btn-save-loc'),
     locationModal: document.getElementById('location-modal'),
@@ -284,6 +289,8 @@ function initGPS() {
         return;
     }
 
+    let speedHistory = []; // For smoothing speedometer
+
     state.gps.watchId = navigator.geolocation.watchPosition(
         (position) => {
             // Success
@@ -293,8 +300,22 @@ function initGPS() {
 
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            const speed = position.coords.speed; // meters/second, can be null
+            const rawSpeed = position.coords.speed; // meters/second, can be null
             const heading = position.coords.heading; // 0-360, can be null
+
+            // Speed smoothing calculations
+            let avgSpeed = null;
+            if (rawSpeed !== null) {
+                // Ignore micro speeds < 1m/s (~2 knots) when standing still / drifting slightly
+                if (rawSpeed < 1.0) {
+                    avgSpeed = 0;
+                    speedHistory = []; // Reset history
+                } else {
+                    speedHistory.push(rawSpeed);
+                    if (speedHistory.length > 4) speedHistory.shift(); // Keep last 4 readings
+                    avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
+                }
+            }
 
             const currentPos = L.latLng(lat, lng);
 
@@ -323,7 +344,7 @@ function initGPS() {
                 state.trip.lastPosition = currentPos; // keep track even if not 'recording' trip
             }
 
-            updateTelemetryDisplay(speed);
+            updateTelemetryDisplay(avgSpeed);
         },
         (error) => {
             // Error
@@ -421,7 +442,7 @@ async function calculateSeaRoute(start, end) {
                 // Distance is in km usually in searoutes
                 const distKm = data.features[0].properties.distance / 1000;
                 const distNm = (distKm * 0.539957).toFixed(2);
-                showDistancePopup(Math.floor(coords.length / 2), coords, distNm);
+                showDistancePopup(Math.floor(coords.length / 2), coords, distNm, distKm.toFixed(2));
                 return;
             }
         } catch (e) {
@@ -433,21 +454,22 @@ async function calculateSeaRoute(start, end) {
     measureLine = L.polyline([start, end], { color: '#ef4444', weight: 3, dashArray: '5, 5' }).addTo(map);
     const distMeters = start.distanceTo(end);
     const distNM = (distMeters * CONV.meters_to_nm).toFixed(2);
+    const distKM = (distMeters * CONV.meters_to_km).toFixed(2);
 
     // Show popup
     const center = L.latLngBounds([start, end]).getCenter();
-    showDistancePopup(center, null, distNM);
+    showDistancePopup(center, null, distNM, distKM);
 
     if (!config.SEAROUTES_API_KEY || config.SEAROUTES_API_KEY.includes('VAŠ')) {
         console.info("Za planiranje isključivo po moru (ukrštanje otoka) potreban je unesen pomorski API ključ u config objektu.");
     }
 }
 
-function showDistancePopup(centerOrIndex, coordsArr, distNm) {
+function showDistancePopup(centerOrIndex, coordsArr, distNm, distKm) {
     let pos = (coordsArr) ? L.latLng(coordsArr[centerOrIndex]) : centerOrIndex;
     L.popup()
         .setLatLng(pos)
-        .setContent(`<b>Udaljenost rute:</b><br>${distNm} NM`)
+        .setContent(`<b>Udaljenost rute:</b><br>${distNm} NM<br><small>${distKm} km</small>`)
         .openOn(map);
 }
 
@@ -656,44 +678,93 @@ function closeLogbook() {
     DOM.logbookModal.classList.remove('active');
 }
 
-async function fetchWeather() {
-    const textBox = document.getElementById('weather-content');
-    textBox.innerHTML = 'Dohvaćanje najnovije pomorske prognoze s DHMZ-a... <i class="fa-solid fa-spinner fa-spin"></i>';
-
-    try {
-        // We use a CORS proxy to fetch DHMZ XML for sailors
-        const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://meteo.hr/prognoze_z.php?section=prognoze_model&param=jadran_n'));
-        if (!response.ok) throw new Error('Network response was not ok');
-        const text = await response.text();
-
-        // Dirty XML scraping to get the text paragraph for the Adriatic. 
-        // Note: DHMZ HTML structure changes often, this is a best-effort scrape for the demo.
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        // DHMZ puts the nautical forecast in specific divs usually class="text-prognoza" or similar.
-        const prognozaDiv = doc.querySelector('.sadrzaj') || doc.querySelector('.tekst_prognoze');
-
-        if (prognozaDiv) {
-            // Clean it up
-            textBox.innerHTML = prognozaDiv.innerText.trim();
-        } else {
-            throw new Error('Could not parse layout');
-        }
-
-    } catch (e) {
-        console.warn(e);
-        textBox.innerHTML = "<b>Upozorenje:</b> Nije moguće direktno dohvatiti tekstualnu prognozu u ovom trenutku.\n\nMolimo kliknite na gumb ispod za ALADIN karte vjetra, ili provjerite službene VHF kanale pomorskog radija.";
-    }
-}
-
 function openWeather() {
     DOM.weatherModal.classList.add('active');
-    fetchWeather();
 }
 
 function closeWeather() {
     DOM.weatherModal.classList.remove('active');
 }
+
+// ===== LOCATIONS LIST LOGIC =====
+
+function openLocationsList() {
+    renderLocationsList();
+    DOM.locationsListModal.classList.add('active');
+}
+
+function closeLocationsList() {
+    DOM.locationsListModal.classList.remove('active');
+}
+
+function renderLocationsList() {
+    const listEl = document.getElementById('custom-locations-list');
+    const spots = getLogs('sharksail_custom_spots');
+    listEl.innerHTML = '';
+
+    if (spots.length === 0) {
+        listEl.innerHTML = '<li class="history-item no-data">Nemate spremljenih lokacija.</li>';
+        return;
+    }
+
+    // Sort array in place or map backwards. Showing newest on top.
+    [...spots].reverse().forEach((spot, reversedIdx) => {
+        const originalIdx = spots.length - 1 - reversedIdx;
+        let catIcon = "fa-fish";
+        if (spot.category === "beach") catIcon = "fa-umbrella-beach";
+        if (spot.category === "anchor") catIcon = "fa-anchor";
+
+        listEl.innerHTML += `
+            <li class="history-item" style="flex-direction: column; align-items: flex-start;">
+                <div style="display:flex; justify-content:space-between; width:100%;">
+                    <div>
+                        <strong><i class="fa-solid ${catIcon}" style="color:var(--accent); margin-right:5px;"></i> ${spot.name}</strong>
+                        <div style="font-size: 0.8rem; color: #a1a1aa; margin-top: 3px;">
+                            Kordinate: ${spot.coords[0].toFixed(4)}, ${spot.coords[1].toFixed(4)}
+                        </div>
+                    </div>
+                    <div>
+                        <button class="icon-btn" onclick="editLocation(${originalIdx})" style="color:var(--accent); margin-right:5px;"><i class="fa-solid fa-pen"></i></button>
+                        <button class="icon-btn" onclick="deleteLocation(${originalIdx})" style="color:var(--danger);"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </li>
+        `;
+    });
+}
+
+window.editLocation = function (idx) {
+    const spots = getLogs('sharksail_custom_spots');
+    if (!spots[idx]) return;
+
+    const newName = prompt("Uredite naziv pozicije:", spots[idx].name);
+    if (newName && newName.trim() !== '') {
+        spots[idx].name = newName.trim();
+        localStorage.setItem('sharksail_custom_spots', JSON.stringify(spots));
+        renderLocationsList();
+
+        // Refresh markers if shown
+        if (state.mapMode === 'fishing') {
+            toggleFishingMode();
+            toggleFishingMode();
+        }
+    }
+};
+
+window.deleteLocation = function (idx) {
+    if (confirm("Jeste li sigurni da želite obrisati ovu poziciju?")) {
+        const spots = getLogs('sharksail_custom_spots');
+        spots.splice(idx, 1);
+        localStorage.setItem('sharksail_custom_spots', JSON.stringify(spots));
+        renderLocationsList();
+
+        // Refresh markers if shown
+        if (state.mapMode === 'fishing') {
+            toggleFishingMode();
+            toggleFishingMode();
+        }
+    }
+};
 
 // ===== SAVE LOCATION MODAL LOGIC =====
 let tempSavePos = null;
@@ -798,6 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.btnFishing.addEventListener('click', toggleFishingMode);
     DOM.btnLogbook.addEventListener('click', openLogbook);
     DOM.btnWeather.addEventListener('click', openWeather);
+    DOM.btnLocationsList.addEventListener('click', openLocationsList);
 
     DOM.btnLogFuel.addEventListener('click', openFuelModal);
     DOM.btnCloseFuel.addEventListener('click', closeFuelModal);
@@ -805,6 +877,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     DOM.btnCloseLogbook.addEventListener('click', closeLogbook);
     DOM.btnCloseWeather.addEventListener('click', closeWeather);
+    DOM.btnCloseLocationsList.addEventListener('click', closeLocationsList);
 
     DOM.btnSaveLoc.addEventListener('click', openLocationModal);
     DOM.btnCloseLocation.addEventListener('click', () => DOM.locationModal.classList.remove('active'));
