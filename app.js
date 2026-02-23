@@ -812,11 +812,13 @@ function confirmSaveLocation() {
     // POŠALJI NA GOOGLE SHEETS
     if (config.GAS_URL && !config.GAS_URL.includes('VAŠ')) {
         const formData = new URLSearchParams(locObj);
+        console.log("Slanje lokacije na GAS...", locObj);
         fetch(config.GAS_URL, {
             method: 'POST',
             body: formData,
             mode: 'no-cors'
-        }).catch(err => console.error("Error saving Location to Sheets:", err));
+        }).then(() => console.log("Uspješno poslano na GAS (no-cors)."))
+            .catch(err => console.error("Error saving Location to Sheets:", err));
     } else {
         console.warn("GAS URL nije postavljen. Lokacija spremljena samo lokalno.");
     }
