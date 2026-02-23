@@ -201,6 +201,27 @@ function initMap() {
 
     // Set up map click handler for tools
     map.on('click', handleMapClick);
+
+    // Add map contextmenu (right click on pc, long press on mobile) for custom spots
+    map.on('contextmenu', function (e) {
+        if (state.mapMode === 'fishing') {
+            const spotName = prompt("Unesite naziv nove pozicije/pošte:");
+            if (spotName) {
+                const currentSpots = getLogs('sharksail_custom_spots');
+                currentSpots.push({
+                    name: spotName,
+                    coords: [e.latlng.lat, e.latlng.lng],
+                    category: 'fishing',
+                    image: null
+                });
+                localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
+
+                // Re-render
+                toggleFishingMode();
+                toggleFishingMode();
+            }
+        }
+    });
 }
 
 // ===== CORE LOGIC =====
@@ -529,26 +550,7 @@ function toggleFishingMode() {
     }
 }
 
-// Add map contextmenu (right click on pc, long press on mobile) for custom spots
-map.on('contextmenu', function (e) {
-    if (state.mapMode === 'fishing') {
-        const spotName = prompt("Unesite naziv nove pozicije/pošte:");
-        if (spotName) {
-            const currentSpots = getLogs('sharksail_custom_spots');
-            currentSpots.push({
-                name: spotName,
-                coords: [e.latlng.lat, e.latlng.lng],
-                category: 'fishing',
-                image: null
-            });
-            localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
 
-            // Re-render
-            toggleFishingMode();
-            toggleFishingMode();
-        }
-    }
-});
 
 // ===== MODAL & FUEL LOGIC =====
 
