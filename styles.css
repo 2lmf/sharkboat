@@ -1,0 +1,566 @@
+:root {
+    /* Day Theme Colors (Default) */
+    --bg-main: #f0f4f8;
+    --bg-panel: #ffffff;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --accent: #0284c7;
+    --accent-hover: #0369a1;
+    --danger: #ef4444;
+    --success: #10b981;
+    --border: #e2e8f0;
+
+    font-family: 'Inter', sans-serif;
+}
+
+[data-theme="night"] {
+    /* Night/Maritime Theme Colors - Red & Dark for preserved night vision */
+    --bg-main: #0a0a0a;
+    --bg-panel: #171717;
+    --text-main: #ff4444;
+    /* Red light preserves dark adaptation */
+    --text-muted: #882222;
+    --accent: #aa0000;
+    --accent-hover: #ff0000;
+    --danger: #ef4444;
+    --success: #00aa00;
+    /* Dimmer green */
+    --border: #331111;
+}
+
+/* Reset & Base Setup */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body,
+html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Prevent scrolling, app-like feel */
+    background-color: var(--bg-main);
+    color: var(--text-main);
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    /* Dynamic viewport height for mobile */
+    position: relative;
+}
+
+/* --- Top Bar --- */
+.top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(to bottom, rgba(var(--bg-panel-rgb, 255, 255, 255), 0.9), transparent);
+    pointer-events: none;
+    /* Let clicks pass through except buttons */
+}
+
+/* Add custom variable logic for night theme gradients if needed, 
+   falling back to solid backgrounds for the panels */
+[data-theme="night"] .top-bar {
+    background: linear-gradient(to bottom, rgba(23, 23, 23, 0.95), transparent);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    pointer-events: auto;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logo h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.logo i {
+    color: var(--accent);
+    font-size: 1.25rem;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    pointer-events: auto;
+}
+
+.icon-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+}
+
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
+.gps-status {
+    background: var(--bg-panel);
+    padding: 0.5rem 0.75rem;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--danger);
+    box-shadow: 0 0 5px var(--danger);
+}
+
+.status-dot.connected {
+    background-color: var(--success);
+    box-shadow: 0 0 5px var(--success);
+}
+
+/* --- Map Area --- */
+.map-container {
+    flex: 1;
+    width: 100%;
+    z-index: 1;
+    /* Below UI elements */
+    background-color: #aad3df;
+    /* Water color placeholder */
+}
+
+/* Leaflet overrides for Night Mode */
+[data-theme="night"] .leaflet-layer,
+[data-theme="night"] .leaflet-control-zoom-in,
+[data-theme="night"] .leaflet-control-zoom-out,
+[data-theme="night"] .leaflet-control-attribution {
+    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+[data-theme="night"] .map-container {
+    background-color: #1a1a2e;
+}
+
+/* --- Floating Tools --- */
+.floating-tools {
+    position: absolute;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.floating-tools.left {
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+}
+
+.floating-tools.right {
+    bottom: calc(220px + 1.5rem);
+    /* Above bottom panel */
+    right: 1rem;
+}
+
+.tool-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tool-btn:active {
+    background: var(--border);
+    transform: scale(0.95);
+}
+
+.tool-btn.primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+
+[data-theme="night"] .tool-btn.primary {
+    color: #171717;
+}
+
+.tool-btn.active {
+    background: var(--accent);
+    color: white;
+}
+
+/* --- Bottom Dashboard --- */
+.dashboard {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--bg-panel);
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    padding: 1rem 1.5rem 1.5rem;
+    z-index: 1000;
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-handle {
+    width: 40px;
+    height: 5px;
+    background: var(--border);
+    border-radius: 5px;
+    margin: 0 auto 0.5rem;
+}
+
+[data-theme="night"] .dashboard-handle {
+    background: var(--text-muted);
+}
+
+.telemetry-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.telemetry-card {
+    background: rgba(128, 128, 128, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+}
+
+.text-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.card-value-large,
+.card-value-medium {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text-main);
+    line-height: 1;
+}
+
+.card-value-large {
+    font-size: 3.5rem;
+    font-weight: 700;
+}
+
+.card-value-medium {
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+/* Action Buttons Grid */
+.action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.action-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 1rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.action-btn:active {
+    opacity: 0.8;
+}
+
+.action-btn.alt {
+    background: var(--bg-main);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+}
+
+[data-theme="night"] .action-btn {
+    color: #171717;
+}
+
+[data-theme="night"] .action-btn.alt {
+    color: var(--text-main);
+}
+
+/* --- Modals --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    padding: 1rem;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    background: var(--bg-panel);
+    width: 100%;
+    max-width: 400px;
+    border-radius: 20px;
+    overflow: hidden;
+    transform: translateY(20px);
+    transition: transform 0.3s;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-overlay.active .modal-content {
+    transform: translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-content.l-width {
+    max-width: 600px;
+}
+
+.modal-body.scrollable {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* History Lists styling for Logbook */
+.history-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.history-item {
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.history-item.no-data {
+    color: var(--text-muted);
+    font-style: italic;
+    justify-content: center;
+}
+
+.history-info strong {
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+/* Weather Modal Specifics */
+.iframe-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.meteo-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.weather-text-box {
+    background: var(--bg-main);
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    /* maintain formatting from DHMZ */
+}
+
+.external-links {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.external-links a.action-btn {
+    text-decoration: none;
+    font-size: 0.85rem;
+    padding: 0.75rem 1rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.input-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.input-group input {
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-size: 1.1rem;
+    outline: none;
+}
+
+.input-group input:focus {
+    border-color: var(--accent);
+}
+
+.stats-preview {
+    background: rgba(128, 128, 128, 0.05);
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+    text-align: center;
+}
+
+.calc-result {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-top: 0.5rem;
+}
+
+.modal-footer {
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.btn-save {
+    width: 100%;
+    padding: 1rem;
+    background: var(--success);
+    color: white;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.05rem;
+}
+
+[data-theme="night"] .btn-save {
+    color: #171717;
+}

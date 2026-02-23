@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="hr" data-theme="day">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SharkSail</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700;900&display=swap"
+        rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+
+        <!-- Header / Top Bar -->
+        <header class="top-bar">
+            <div class="logo">
+                <i class="fa-solid fa-anchor"></i>
+                <h1>SharkSail</h1>
+            </div>
+            <div class="header-controls">
+                <button id="theme-toggle" class="icon-btn" aria-label="Toggle Night Mode">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+                <div class="gps-status" id="gps-status" title="Satelitski signal">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    <span class="status-dot disconnected"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Map Area -->
+        <main class="map-container" id="map">
+            <!-- Leaflet map will be injected here -->
+        </main>
+
+        <!-- Tool Floating Buttons (Left) -->
+        <div class="floating-tools left">
+            <button class="tool-btn" id="btn-measure" aria-label="Mjerenje udaljenosti" title="Mjeri udaljenost">
+                <i class="fa-solid fa-ruler-combined"></i>
+            </button>
+            <button class="tool-btn" id="btn-fishing" aria-label="Ribolovne pošte" title="Ribolovne pošte">
+                <i class="fa-solid fa-fish-fins"></i>
+            </button>
+            <button class="tool-btn" id="btn-weather" aria-label="Prognoza za pomorce" title="Meteo">
+                <i class="fa-solid fa-cloud-sun-rain"></i>
+            </button>
+            <button class="tool-btn" id="btn-logbook" aria-label="Brodski dnevnik" title="Dnevnik">
+                <i class="fa-solid fa-book-journal-whills"></i>
+            </button>
+        </div>
+
+        <!-- Location Floating Button (Right) -->
+        <div class="floating-tools right">
+            <button class="tool-btn primary" id="btn-locate" aria-label="Pronađi me">
+                <i class="fa-solid fa-location-crosshairs"></i>
+            </button>
+        </div>
+
+        <!-- Bottom Dashboard Panel -->
+        <div class="dashboard bottom-panel">
+            <div class="dashboard-handle"></div>
+
+            <div class="telemetry-grid">
+                <!-- Speed Module -->
+                <div class="telemetry-card speed-card">
+                    <div class="card-header">
+                        <span>BRZINA</span>
+                        <button id="speed-unit-toggle" class="text-btn">KNOTS <i
+                                class="fa-solid fa-right-left"></i></button>
+                    </div>
+                    <div class="card-value-large">
+                        <span id="speed-val">0.0</span>
+                    </div>
+                </div>
+
+                <!-- Distance Module -->
+                <div class="telemetry-card distance-card">
+                    <div class="card-header">
+                        <span>PUT</span>
+                        <button id="dist-unit-toggle" class="text-btn">NM <i
+                                class="fa-solid fa-right-left"></i></button>
+                    </div>
+                    <div class="card-value-medium">
+                        <span id="dist-val">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="action-btn" id="btn-start-trip">
+                    <i class="fa-solid fa-play"></i> START ROUTE
+                </button>
+                <button class="action-btn alt" id="btn-log-fuel">
+                    <i class="fa-solid fa-gas-pump"></i> TOČENJE
+                </button>
+            </div>
+        </div>
+
+        <!-- Fuel Log Modal (Hidden by default) -->
+        <div class="modal-overlay" id="fuel-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-gas-pump"></i> Unos Goriva</h2>
+                    <button class="close-btn" id="btn-close-fuel"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label for="fuel-liters">NATOČENO (L)</label>
+                        <input type="number" id="fuel-liters" placeholder="npr. 50" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label for="fuel-price">CIJENA (EUR)</label>
+                        <input type="number" id="fuel-price" placeholder="npr. 75.50" step="0.01">
+                    </div>
+                    <div class="stats-preview">
+                        <p>Pređeno od zadnjeg točenja: <strong id="fuel-dist-since">0.0 NM</strong></p>
+                        <p class="calc-result" id="fuel-calc-result">-- L/NM</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-save" id="btn-save-fuel">Spremi Zapis</button>
+                </div>
+            </div>
+        </div>
+        <!-- Logbook Modal -->
+        <div class="modal-overlay" id="logbook-modal">
+            <div class="modal-content l-width">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-book-journal-whills"></i> Brodski Dnevnik</h2>
+                    <button class="close-btn" id="btn-close-logbook"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body scrollable">
+                    <h3>Zadnje Rute</h3>
+                    <ul id="route-history-list" class="history-list">
+                        <!-- Populated via JS -->
+                    </ul>
+                    <h3 style="margin-top:1rem;">Zadnja Točenja</h3>
+                    <ul id="fuel-history-list" class="history-list">
+                        <!-- Populated via JS -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Modal -->
+        <div class="modal-overlay" id="weather-modal">
+            <div class="modal-content l-width">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-cloud-sun-rain"></i> Prognoza za pomorce</h2>
+                    <button class="close-btn" id="btn-close-weather"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body iframe-container">
+                    <p class="meteo-note">Podaci preuzeti s DHMZ prognoze za Jadran za pomorce.</p>
+                    <div id="weather-content" class="weather-text-box">
+                        Učitavanje prognoze...
+                    </div>
+                    <div class="external-links">
+                        <a href="https://meteo.hr/prognoze.php?section=prognoze_model&param=aladin_vjetar"
+                            target="_blank" class="action-btn alt">Aladin Vjetar <i
+                                class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- End App Container -->
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

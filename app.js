@@ -1,0 +1,677 @@
+// ===== STATE MANAGEMENT =====
+const state = {
+    theme: 'day',
+    units: {
+        speed: 'knots', // 'knots' or 'kmh'
+        distance: 'nm'  // 'nm' or 'km'
+    },
+    trip: {
+        active: false,
+        distanceNM: 0,
+        distanceKM: 0,
+        startTime: null,
+        lastPosition: null
+    },
+    gps: {
+        watchId: null,
+        connected: false
+    },
+    mapMode: 'navigate', // 'navigate', 'measure', 'fishing'
+    measurePoints: []
+};
+
+// Conversions
+const CONV = {
+    ms_to_knots: 1.94384,
+    ms_to_kmh: 3.6,
+    meters_to_nm: 0.000539957,
+    meters_to_km: 0.001
+};
+
+// ===== DOM ELEMENTS =====
+const DOM = {
+    themeToggle: document.getElementById('theme-toggle'),
+    gpsDot: document.querySelector('.status-dot'),
+
+    // Telemetry
+    speedVal: document.getElementById('speed-val'),
+    speedUnitToggle: document.getElementById('speed-unit-toggle'),
+    distVal: document.getElementById('dist-val'),
+    distUnitToggle: document.getElementById('dist-unit-toggle'),
+
+    // Buttons
+    btnLocate: document.getElementById('btn-locate'),
+    btnMeasure: document.getElementById('btn-measure'),
+    btnFishing: document.getElementById('btn-fishing'),
+    btnStartTrip: document.getElementById('btn-start-trip'),
+
+    // Logbook & Weather Modal
+    btnLogbook: document.getElementById('btn-logbook'),
+    btnCloseLogbook: document.getElementById('btn-close-logbook'),
+    logbookModal: document.getElementById('logbook-modal'),
+
+    btnWeather: document.getElementById('btn-weather'),
+    btnCloseWeather: document.getElementById('btn-close-weather'),
+    weatherModal: document.getElementById('weather-modal')
+};
+
+// ===== DATA STORAGE (DUAL LOCAL/SHEETS BACKEND) =====
+const lsKeys = {
+    ROUTES: 'sharksails_routes',
+    FUEL: 'sharksails_fuel'
+};
+
+function getLogs(key) {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+const config = {
+    // KORISNIK: Upišite ovdje Web App URL od vašeg objavljenog Google Apps Script-a
+    GAS_URL: 'https://script.google.com/macros/s/AKfycby6jJP36qIjPWl-xztt-b-FOCVpmNmKnsknlQFvzvyZhm347r4kS5fFlaExW1T0YOpC/exec',
+    // KORISNIK: Upišite API Key za pomorske rute (npr. SeaRoutes API) ako ga imate
+    SEAROUTES_API_KEY: ''
+};
+
+async function fetchLogsFromSheets(type) {
+    if (!config.GAS_URL || config.GAS_URL.includes('VAŠ')) {
+        console.warn("Google Script URL nije postavljen. Koristim privremene prazne podatke.");
+        return [];
+    }
+    try {
+        const response = await fetch(`${config.GAS_URL}?type=${type}`);
+        return await response.json();
+    } catch (e) {
+        console.error("Greška pri dohvaćanju iz Sheeta:", e);
+        return [];
+    }
+}
+
+async function saveRouteLog(distanceNM, distanceKM, startTime) {
+    if (distanceNM < 0.1) return; // Don't save empty/accidental trips
+
+    const endTime = new Date();
+    const routeObj = {
+        action: 'logRoute',
+        id: Date.now(),
+        date: endTime.toLocaleDateString('hr-HR'),
+        startTime: startTime.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' }),
+        endTime: endTime.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' }),
+        distanceNM: distanceNM.toFixed(2),
+        distanceKM: distanceKM.toFixed(2)
+    };
+
+    // 1. ODRADI LOKALNO SPREMANJE (Na razini mobitela)
+    const localLogs = getLogs(lsKeys.ROUTES);
+    localLogs.unshift(routeObj);
+    if (localLogs.length > 50) localLogs.pop(); // Drži max 50 na mobitelu
+    localStorage.setItem(lsKeys.ROUTES, JSON.stringify(localLogs));
+
+    // 2. POŠALJI NA GOOGLE SHEETS
+    if (config.GAS_URL && !config.GAS_URL.includes('VAŠ')) {
+        const formData = new URLSearchParams(routeObj);
+        fetch(config.GAS_URL, {
+            method: 'POST',
+            body: formData,
+            mode: 'no-cors'
+        }).catch(err => console.error("Error saving Route to Sheets:", err));
+    } else {
+        console.warn("GAS URL nije postavljen. Log rute se sprema isključivo na uređaj.");
+    }
+}
+
+async function saveFuelEntry(liters, price, distNM, lPerNm) {
+    const fuelObj = {
+        action: 'logFuel',
+        id: Date.now(),
+        date: new Date().toLocaleDateString('hr-HR'),
+        liters: liters,
+        price: price,
+        distSince: distNM,
+        efficiency: lPerNm
+    };
+
+    // 1. ODRADI LOKALNO SPREMANJE
+    const localLogs = getLogs(lsKeys.FUEL);
+    localLogs.unshift(fuelObj);
+    if (localLogs.length > 50) localLogs.pop();
+    localStorage.setItem(lsKeys.FUEL, JSON.stringify(localLogs));
+
+    // 2. POŠALJI NA GOOGLE SHEETS
+    if (config.GAS_URL && !config.GAS_URL.includes('VAŠ')) {
+        const formData = new URLSearchParams(fuelObj);
+        fetch(config.GAS_URL, {
+            method: 'POST',
+            body: formData,
+            mode: 'no-cors'
+        }).catch(err => console.error("Error saving Fuel to Sheets:", err));
+    } else {
+        console.warn("GAS URL nije postavljen. Log goriva se sprema isključivo na uređaj.");
+    }
+}
+
+// ===== MAP INITIALIZATION =====
+let map;
+let userMarker;
+let routeLine;
+let routeCoordinates = [];
+let measureLine;
+let measureMarkers = [];
+let fishingLayer;
+
+function initMap() {
+    // Center of Adriatic sea roughly as default
+    map = L.map('map', {
+        zoomControl: false // Custom placement if needed
+    }).setView([43.5, 15.5], 7);
+
+    // Base Layer: OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+    }).addTo(map);
+
+    // Nautical Layer: OpenSeaMap
+    L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+        attribution: '© OpenSeaMap',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Add zoom control top right
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Initialize layer group for fishing spots
+    fishingLayer = L.layerGroup().addTo(map);
+
+    // Route line setup
+    routeLine = L.polyline([], { color: '#0284c7', weight: 4 }).addTo(map);
+
+    // Set up map click handler for tools
+    map.on('click', handleMapClick);
+}
+
+// ===== CORE LOGIC =====
+
+function toggleTheme() {
+    state.theme = state.theme === 'day' ? 'night' : 'day';
+    document.documentElement.setAttribute('data-theme', state.theme);
+    DOM.themeToggle.innerHTML = state.theme === 'day'
+        ? '<i class="fa-solid fa-moon"></i>'
+        : '<i class="fa-solid fa-sun"></i>';
+}
+
+function updateTelemetryDisplay(speedMS) {
+    // 1. Update Speed
+    let speedStr = "0.0";
+    if (speedMS !== null && speedMS > 0.5) { // Threshold to ignore noise
+        if (state.units.speed === 'knots') {
+            speedStr = (speedMS * CONV.ms_to_knots).toFixed(1);
+        } else {
+            speedStr = (speedMS * CONV.ms_to_kmh).toFixed(1);
+        }
+    }
+    DOM.speedVal.textContent = speedStr;
+
+    // 2. Update Distance
+    let distStr = "0.00";
+    if (state.units.distance === 'nm') {
+        distStr = state.trip.distanceNM.toFixed(2);
+    } else {
+        distStr = state.trip.distanceKM.toFixed(2);
+    }
+    DOM.distVal.textContent = distStr;
+}
+
+function toggleSpeedUnit() {
+    state.units.speed = state.units.speed === 'knots' ? 'kmh' : 'knots';
+    DOM.speedUnitToggle.innerHTML = `${state.units.speed.toUpperCase()} <i class="fa-solid fa-right-left"></i>`;
+    updateTelemetryDisplay(null); // Just forces string update
+}
+
+function toggleDistUnit() {
+    state.units.distance = state.units.distance === 'nm' ? 'km' : 'nm';
+    DOM.distUnitToggle.innerHTML = `${state.units.distance.toUpperCase()} <i class="fa-solid fa-right-left"></i>`;
+    updateTelemetryDisplay(null);
+}
+
+// ===== GEOLOCATION & TRACKING =====
+
+// Custom Leaflet icon for user
+const boatIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: "<div style='background-color:#0284c7; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);'></div>",
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+});
+
+function initGPS() {
+    if (!navigator.geolocation) {
+        alert("Vaš uređaj ne podržava praćenje lokacije.");
+        return;
+    }
+
+    state.gps.watchId = navigator.geolocation.watchPosition(
+        (position) => {
+            // Success
+            state.gps.connected = true;
+            DOM.gpsDot.classList.remove('disconnected');
+            DOM.gpsDot.classList.add('connected');
+
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const speed = position.coords.speed; // meters/second, can be null
+            const heading = position.coords.heading; // 0-360, can be null
+
+            const currentPos = L.latLng(lat, lng);
+
+            // Update Maker
+            if (!userMarker) {
+                userMarker = L.marker([lat, lng], { icon: boatIcon }).addTo(map);
+                map.setView([lat, lng], 14); // Initial zoom to user
+            } else {
+                userMarker.setLatLng([lat, lng]);
+            }
+
+            // Update Route & Distance if Trip is Active
+            if (state.trip.active) {
+                if (state.trip.lastPosition) {
+                    const distMeters = state.trip.lastPosition.distanceTo(currentPos);
+                    // Filter unrealistic jumps (e.g. > 1km in a second)
+                    if (distMeters < 1000) {
+                        state.trip.distanceNM += (distMeters * CONV.meters_to_nm);
+                        state.trip.distanceKM += (distMeters * CONV.meters_to_km);
+                        routeCoordinates.push([lat, lng]);
+                        routeLine.setLatLngs(routeCoordinates);
+                    }
+                }
+                state.trip.lastPosition = currentPos;
+            } else {
+                state.trip.lastPosition = currentPos; // keep track even if not 'recording' trip
+            }
+
+            updateTelemetryDisplay(speed);
+        },
+        (error) => {
+            // Error
+            console.warn("GPS Error:", error);
+            state.gps.connected = false;
+            DOM.gpsDot.classList.add('disconnected');
+            DOM.gpsDot.classList.remove('connected');
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        }
+    );
+}
+
+function centerOnUser() {
+    if (userMarker) {
+        map.setView(userMarker.getLatLng(), 15);
+    } else {
+        alert("Traženje signala lokacije...");
+    }
+}
+
+function toggleTrip() {
+    state.trip.active = !state.trip.active;
+    if (state.trip.active) {
+        DOM.btnStartTrip.innerHTML = `<i class="fa-solid fa-stop"></i> STOP ROUTE`;
+        DOM.btnStartTrip.style.backgroundColor = 'var(--danger)';
+        DOM.btnStartTrip.style.color = 'white';
+        // Reset trip counters
+        state.trip.distanceNM = 0;
+        state.trip.distanceKM = 0;
+        state.trip.startTime = new Date();
+        routeCoordinates = [];
+        if (state.trip.lastPosition) {
+            routeCoordinates.push([state.trip.lastPosition.lat, state.trip.lastPosition.lng]);
+        }
+        routeLine.setLatLngs(routeCoordinates);
+        alert("Ruta započeta!");
+    } else {
+        DOM.btnStartTrip.innerHTML = `<i class="fa-solid fa-play"></i> START ROUTE`;
+        DOM.btnStartTrip.style.backgroundColor = '';
+        DOM.btnStartTrip.style.color = '';
+
+        // Save the route if it has distance
+        if (state.trip.distanceNM > 0.1) {
+            saveRouteLog(state.trip.distanceNM, state.trip.distanceKM, state.trip.startTime);
+            alert(`Ruta uspješno spremljena u dnevnik!\nPređeno: ${state.trip.distanceNM.toFixed(2)} NM`);
+        } else {
+            alert("Ruta zaustavljena. (Prekratko za spremanje)");
+        }
+    }
+}
+
+// ===== TOOLS (MEASURE & FISHING) =====
+
+function handleMapClick(e) {
+    if (state.mapMode === 'measure') {
+        const latlng = e.latlng;
+
+        if (state.measurePoints.length === 2) {
+            // Reset measure tool
+            state.measurePoints = [];
+            if (measureLine) map.removeLayer(measureLine);
+            measureMarkers.forEach(m => map.removeLayer(m));
+            measureMarkers = [];
+        }
+
+        state.measurePoints.push(latlng);
+
+        const marker = L.marker(latlng).addTo(map);
+        measureMarkers.push(marker);
+
+        if (state.measurePoints.length === 2) {
+            calculateSeaRoute(state.measurePoints[0], state.measurePoints[1]);
+        }
+    }
+}
+
+async function calculateSeaRoute(start, end) {
+    // Provjera imamo li pomorski API ključ (e.g. searoutes.com)
+    if (config.SEAROUTES_API_KEY && !config.SEAROUTES_API_KEY.includes('VAŠ')) {
+        // Stvarni preko mora API poziv
+        try {
+            const response = await fetch(`https://api.searoutes.com/routing/v2/sea/route?departure=${start.lng},${start.lat}&arrival=${end.lng},${end.lat}`, {
+                headers: { 'x-api-key': config.SEAROUTES_API_KEY }
+            });
+            const data = await response.json();
+
+            if (data.features && data.features.length > 0) {
+                const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is LngLat, Leaflet is LatLng
+                measureLine = L.polyline(coords, { color: '#ef4444', weight: 4, dashArray: '5, 5' }).addTo(map);
+
+                // Distance is in km usually in searoutes
+                const distKm = data.features[0].properties.distance / 1000;
+                const distNm = (distKm * 0.539957).toFixed(2);
+                showDistancePopup(Math.floor(coords.length / 2), coords, distNm);
+                return;
+            }
+        } catch (e) {
+            console.warn("SeaRoutes API Error, falling back to straight line.", e);
+        }
+    }
+
+    // Fallback: Ravna linija (Straight line / As the crow flies) ako API nije dostupan
+    measureLine = L.polyline([start, end], { color: '#ef4444', weight: 3, dashArray: '5, 5' }).addTo(map);
+    const distMeters = start.distanceTo(end);
+    const distNM = (distMeters * CONV.meters_to_nm).toFixed(2);
+
+    // Show popup
+    const center = L.latLngBounds([start, end]).getCenter();
+    showDistancePopup(center, null, distNM);
+
+    if (!config.SEAROUTES_API_KEY || config.SEAROUTES_API_KEY.includes('VAŠ')) {
+        console.info("Za planiranje isključivo po moru (ukrštanje otoka) potreban je unesen pomorski API ključ u config objektu.");
+    }
+}
+
+function showDistancePopup(centerOrIndex, coordsArr, distNm) {
+    let pos = (coordsArr) ? L.latLng(coordsArr[centerOrIndex]) : centerOrIndex;
+    L.popup()
+        .setLatLng(pos)
+        .setContent(`<b>Udaljenost rute:</b><br>${distNm} NM`)
+        .openOn(map);
+}
+
+function toggleMeasureMode() {
+    if (state.mapMode === 'measure') {
+        state.mapMode = 'navigate';
+        DOM.btnMeasure.classList.remove('active');
+        // Clean up
+        state.measurePoints = [];
+        if (measureLine) map.removeLayer(measureLine);
+        measureMarkers.forEach(m => map.removeLayer(m));
+        measureMarkers = [];
+    } else {
+        state.mapMode = 'measure';
+        DOM.btnMeasure.classList.add('active');
+        DOM.btnFishing.classList.remove('active');
+        alert("Način mjerenja: Kliknite na dvije točke na karti.");
+    }
+}
+
+// Internet/Global mock poštu (simuliramo da smo povukli podatke API-jem s nečijeg servera)
+const globalFishingSpots = [
+    { name: "[INTERNET] Pošta Gof 1", coords: [43.6, 15.6], type: "Jigging / Javna" },
+    { name: "[INTERNET] Plić Školj", coords: [43.4, 15.7], type: "Lignje / Javna" },
+    { name: "[INTERNET] Brak Mrzanj", coords: [43.7, 15.4], type: "Panula / Javna" }
+];
+
+function toggleFishingMode() {
+    if (state.mapMode === 'fishing') {
+        state.mapMode = 'navigate';
+        DOM.btnFishing.classList.remove('active');
+        fishingLayer.clearLayers();
+    } else {
+        state.mapMode = 'fishing';
+        DOM.btnFishing.classList.add('active');
+        DOM.btnMeasure.classList.remove('active');
+
+        // Custom ikone za razlikovanje
+        const publicFishIcon = L.divIcon({
+            html: '<i class="fa-solid fa-earth-europe" style="color:var(--accent); font-size:24px; text-shadow: 0 0 3px white;"></i>',
+            className: 'dummy-public',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -24]
+        });
+
+        const customFishIcon = L.divIcon({
+            html: '<i class="fa-solid fa-location-dot" style="color:var(--danger); font-size:24px; text-shadow: 0 0 3px white;"></i>',
+            className: 'dummy-custom',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -24]
+        });
+
+        // 1. Add "Internet" markers
+        globalFishingSpots.forEach(spot => {
+            L.marker(spot.coords, { icon: publicFishIcon })
+                .bindPopup(`<b>${spot.name}</b><br><small>${spot.type}</small>`)
+                .addTo(fishingLayer);
+        });
+
+        // 2. Add local custom markers
+        const customSpots = getLogs('sharksail_custom_spots');
+        customSpots.forEach(spot => {
+            L.marker(spot.coords, { icon: customFishIcon })
+                .bindPopup(`<b>${spot.name}</b><br><small>Osobna pošta</small>`)
+                .addTo(fishingLayer);
+        });
+
+        // Find user pos or center
+        if (userMarker) {
+            alert(`Prikazujem ribolovne pošte (Javne i Osobne). \n\nDugi klik na kartu za dodavanje nove pošte!`);
+        }
+    }
+}
+
+// Add map contextmenu (right click on pc, long press on mobile) for custom spots
+map.on('contextmenu', function (e) {
+    if (state.mapMode === 'fishing') {
+        const spotName = prompt("Unesite naziv nove pošte:");
+        if (spotName) {
+            const currentSpots = getLogs('sharksail_custom_spots');
+            currentSpots.push({
+                name: spotName,
+                coords: [e.latlng.lat, e.latlng.lng]
+            });
+            localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
+
+            // Re-render
+            toggleFishingMode();
+            toggleFishingMode();
+        }
+    }
+});
+
+// ===== MODAL & FUEL LOGIC =====
+
+function openFuelModal() {
+    DOM.fuelModal.classList.add('active');
+    document.getElementById('fuel-dist-since').textContent = `${state.trip.distanceNM.toFixed(2)} NM`;
+}
+
+function closeFuelModal() {
+    DOM.fuelModal.classList.remove('active');
+}
+
+function saveFuelLog() {
+    const liters = document.getElementById('fuel-liters').value;
+    const price = document.getElementById('fuel-price').value;
+
+    if (!liters || !price) {
+        alert('Molimo unesite litre i cijenu.');
+        return;
+    }
+
+    // Basic calculation for preview
+    const dist = state.trip.distanceNM > 0 ? state.trip.distanceNM : 0.1; // avoid /0
+    const lPerNm = (parseFloat(liters) / dist).toFixed(2);
+
+    document.getElementById('fuel-calc-result').textContent = `${lPerNm} L/NM | ${(parseFloat(price) / dist).toFixed(2)} EUR/NM`;
+
+    // Save
+    saveFuelEntry(liters, price, dist.toFixed(2), lPerNm);
+
+    setTimeout(() => {
+        alert("Unos uspješno spremljen u dnevnik!");
+        closeFuelModal();
+        // Reset trip since filled up
+        document.getElementById('fuel-liters').value = '';
+        document.getElementById('fuel-price').value = '';
+        if (state.trip.active) { toggleTrip(); toggleTrip(); } // quick restart distance
+    }, 500);
+}
+
+// ===== LOGBOOK & WEATHER ======
+
+async function renderLogbook() {
+    const routeList = document.getElementById('route-history-list');
+    const fuelList = document.getElementById('fuel-history-list');
+
+    routeList.innerHTML = '<li>Učitavanje...</li>';
+    fuelList.innerHTML = '<li>Učitavanje...</li>';
+
+    // Pokušaj povući iz baze, u suprotnom fallback na mobitel/local.
+    // Primarna logika će koristiti local podatke radi veće brzine na moru (slab signal),
+    // a opcijski možemo ubaciti gumb 'Sync' za dohvaćanje svega s Google Sheeta.
+
+    const routes = getLogs(lsKeys.ROUTES);
+    const fuels = getLogs(lsKeys.FUEL);
+
+    routeList.innerHTML = '';
+    if (!routes || routes.length === 0) {
+        routeList.innerHTML = '<li class="history-item no-data">Nema zabilježenih ruta ili backend nije povezan.</li>';
+    } else {
+        routes.forEach(r => {
+            routeList.innerHTML += `
+                <li class="history-item">
+                    <div class="history-info">
+                        <strong>${r.date}</strong>
+                        <span>${r.startTime} - ${r.endTime}</span>
+                    </div>
+                    <div class="history-val">
+                        <span>${r.distanceNM} NM<br><small>(${r.distanceKM} km)</small></span>
+                    </div>
+                </li>
+            `;
+        });
+    }
+
+    fuelList.innerHTML = '';
+    if (!fuels || fuels.length === 0) {
+        fuelList.innerHTML = '<li class="history-item no-data">Nema unosa goriva ili backend nije povezan.</li>';
+    } else {
+        fuels.forEach(f => {
+            fuelList.innerHTML += `
+                <li class="history-item">
+                    <div class="history-info">
+                        <strong>${f.date}</strong>
+                        <span>${f.liters} L • ${f.price} €</span>
+                    </div>
+                    <div class="history-val" style="text-align: right;">
+                        <span style="color:var(--accent); font-weight:bold;">${f.efficiency} L/NM</span><br>
+                        <small>Pređeno: ${f.distSince} NM</small>
+                    </div>
+                </li>
+            `;
+        });
+    }
+}
+
+function openLogbook() {
+    renderLogbook();
+    DOM.logbookModal.classList.add('active');
+}
+
+function closeLogbook() {
+    DOM.logbookModal.classList.remove('active');
+}
+
+async function fetchWeather() {
+    const textBox = document.getElementById('weather-content');
+    textBox.innerHTML = 'Dohvaćanje najnovije pomorske prognoze s DHMZ-a... <i class="fa-solid fa-spinner fa-spin"></i>';
+
+    try {
+        // We use a CORS proxy to fetch DHMZ XML for sailors
+        const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://meteo.hr/prognoze_z.php?section=prognoze_model&param=jadran_n'));
+        if (!response.ok) throw new Error('Network response was not ok');
+        const text = await response.text();
+
+        // Dirty XML scraping to get the text paragraph for the Adriatic. 
+        // Note: DHMZ HTML structure changes often, this is a best-effort scrape for the demo.
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        // DHMZ puts the nautical forecast in specific divs usually class="text-prognoza" or similar.
+        const prognozaDiv = doc.querySelector('.sadrzaj') || doc.querySelector('.tekst_prognoze');
+
+        if (prognozaDiv) {
+            // Clean it up
+            textBox.innerHTML = prognozaDiv.innerText.trim();
+        } else {
+            throw new Error('Could not parse layout');
+        }
+
+    } catch (e) {
+        console.warn(e);
+        textBox.innerHTML = "<b>Upozorenje:</b> Nije moguće direktno dohvatiti tekstualnu prognozu u ovom trenutku.\n\nMolimo kliknite na gumb ispod za ALADIN karte vjetra, ili provjerite službene VHF kanale pomorskog radija.";
+    }
+}
+
+function openWeather() {
+    DOM.weatherModal.classList.add('active');
+    fetchWeather();
+}
+
+function closeWeather() {
+    DOM.weatherModal.classList.remove('active');
+}
+
+
+// ===== EVENT LISTENERS =====
+document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    initGPS();
+
+    DOM.themeToggle.addEventListener('click', toggleTheme);
+    DOM.speedUnitToggle.addEventListener('click', toggleSpeedUnit);
+    DOM.distUnitToggle.addEventListener('click', toggleDistUnit);
+
+    DOM.btnLocate.addEventListener('click', centerOnUser);
+    DOM.btnStartTrip.addEventListener('click', toggleTrip);
+    DOM.btnMeasure.addEventListener('click', toggleMeasureMode);
+    DOM.btnFishing.addEventListener('click', toggleFishingMode);
+    DOM.btnLogbook.addEventListener('click', openLogbook);
+    DOM.btnWeather.addEventListener('click', openWeather);
+
+    DOM.btnLogFuel.addEventListener('click', openFuelModal);
+    DOM.btnCloseFuel.addEventListener('click', closeFuelModal);
+    DOM.btnSaveFuel.addEventListener('click', saveFuelLog);
+
+    DOM.btnCloseLogbook.addEventListener('click', closeLogbook);
+    DOM.btnCloseWeather.addEventListener('click', closeWeather);
+});
