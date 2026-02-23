@@ -1,9 +1,9 @@
-const CACHE_NAME = 'sharkboat-v7';
+const CACHE_NAME = 'sharkboat-v8';
 const ASSETS = [
     './',
     './index.html',
-    './styles.css?v=6',
-    './app.js?v=6',
+    './styles.css?v=7',
+    './app.js?v=7',
     './manifest.json',
     './icon.svg',
     './logo.png'

@@ -39,10 +39,8 @@ const DOM = {
     distVal: document.getElementById('dist-val'),
     distUnitToggle: document.getElementById('dist-unit-toggle'),
 
-    // Buttons
     btnLocate: document.getElementById('btn-locate'),
     btnMeasure: document.getElementById('btn-measure'),
-    btnFishing: document.getElementById('btn-fishing'),
     btnStartTrip: document.getElementById('btn-start-trip'),
 
     // Logbook Modal
@@ -208,24 +206,22 @@ function initMap() {
 
     // Add map contextmenu (right click on pc, long press on mobile) for custom spots
     map.on('contextmenu', function (e) {
-        if (state.mapMode === 'fishing') {
-            const spotName = prompt("Unesite naziv nove pozicije/pošte:");
-            if (spotName) {
-                const currentSpots = getLogs('sharksail_custom_spots');
-                currentSpots.push({
-                    name: spotName,
-                    coords: [e.latlng.lat, e.latlng.lng],
-                    category: 'fishing',
-                    image: null
-                });
-                localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
-
-                // Re-render
-                toggleFishingMode();
-                toggleFishingMode();
-            }
+        const spotName = prompt("Unesite naziv nove pozicije/pošte:");
+        if (spotName) {
+            const currentSpots = getLogs('sharksail_custom_spots');
+            currentSpots.push({
+                name: spotName,
+                coords: [e.latlng.lat, e.latlng.lng],
+                category: 'fishing',
+                image: null
+            });
+            localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
+            renderSavedLocations();
         }
     });
+
+    // Ovdje odmah crtamo pošte (ribolovne točke i custom pozicije) jer se sad stalno vide
+    renderSavedLocations();
 }
 
 // ===== CORE LOGIC =====
@@ -484,7 +480,6 @@ function toggleMeasureMode() {
     } else {
         state.mapMode = 'measure';
         DOM.btnMeasure.classList.add('active');
-        DOM.btnFishing.classList.remove('active');
         alert("Način mjerenja: Kliknite na dvije točke na karti.");
     }
 }
@@ -496,79 +491,66 @@ const globalFishingSpots = [
     { name: "[INTERNET] Brak Mrzanj", coords: [43.7, 15.4], type: "Panula / Javna" }
 ];
 
-function toggleFishingMode() {
-    if (state.mapMode === 'fishing') {
-        state.mapMode = 'navigate';
-        DOM.btnFishing.classList.remove('active');
-        fishingLayer.clearLayers();
-    } else {
-        state.mapMode = 'fishing';
-        DOM.btnFishing.classList.add('active');
-        DOM.btnMeasure.classList.remove('active');
+function renderSavedLocations() {
+    fishingLayer.clearLayers();
 
-        // Custom ikone za razlikovanje
-        const publicFishIcon = L.divIcon({
-            html: '<i class="fa-solid fa-earth-europe" style="color:var(--accent); font-size:24px; text-shadow: 0 0 3px white;"></i>',
-            className: 'dummy-public',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24],
-            popupAnchor: [0, -24]
-        });
+    // Custom ikone za razlikovanje
+    const publicFishIcon = L.divIcon({
+        html: '<i class="fa-solid fa-earth-europe" style="color:var(--accent); font-size:24px; text-shadow: 0 0 3px white;"></i>',
+        className: 'dummy-public',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -24]
+    });
 
-        const customFishIcon = L.divIcon({
-            html: '<i class="fa-solid fa-location-dot" style="color:var(--danger); font-size:24px; text-shadow: 0 0 3px white;"></i>',
-            className: 'dummy-custom',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24],
-            popupAnchor: [0, -24]
-        });
+    const customFishIcon = L.divIcon({
+        html: '<i class="fa-solid fa-location-dot" style="color:var(--danger); font-size:24px; text-shadow: 0 0 3px white;"></i>',
+        className: 'dummy-custom',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -24]
+    });
 
-        const beachIcon = L.divIcon({
-            html: '<i class="fa-solid fa-umbrella-beach" style="color:var(--accent); font-size:24px; text-shadow: 0 0 3px white;"></i>',
-            className: 'dummy-beach',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24],
-            popupAnchor: [0, -24]
-        });
+    const beachIcon = L.divIcon({
+        html: '<i class="fa-solid fa-umbrella-beach" style="color:var(--accent); font-size:24px; text-shadow: 0 0 3px white;"></i>',
+        className: 'dummy-beach',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -24]
+    });
 
-        const anchorIcon = L.divIcon({
-            html: '<i class="fa-solid fa-anchor" style="color:#a1a1aa; font-size:24px; text-shadow: 0 0 3px white;"></i>',
-            className: 'dummy-anchor',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24],
-            popupAnchor: [0, -24]
-        });
+    const anchorIcon = L.divIcon({
+        html: '<i class="fa-solid fa-anchor" style="color:#a1a1aa; font-size:24px; text-shadow: 0 0 3px white;"></i>',
+        className: 'dummy-anchor',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -24]
+    });
 
-        // 1. Add "Internet" markers
-        globalFishingSpots.forEach(spot => {
-            L.marker(spot.coords, { icon: publicFishIcon })
-                .bindPopup(`<b>${spot.name}</b><br><small>${spot.type}</small>`)
-                .addTo(fishingLayer);
-        });
+    // 1. Add "Internet" markers
+    globalFishingSpots.forEach(spot => {
+        L.marker(spot.coords, { icon: publicFishIcon })
+            .bindPopup(`<b>${spot.name}</b><br><small>${spot.type}</small>`)
+            .addTo(fishingLayer);
+    });
 
-        // 2. Add local custom markers
-        const customSpots = getLogs('sharksail_custom_spots');
-        customSpots.forEach(spot => {
-            let icon = customFishIcon;
-            let label = "Osobna pošta";
-            if (spot.category === 'beach') { icon = beachIcon; label = "Plaža"; }
-            if (spot.category === 'anchor') { icon = anchorIcon; label = "Sidrište"; }
+    // 2. Add local custom markers
+    const customSpots = getLogs('sharksail_custom_spots');
+    customSpots.forEach(spot => {
+        let icon = customFishIcon;
+        let label = "Osobna pošta";
+        if (spot.category === 'beach') { icon = beachIcon; label = "Plaža"; }
+        if (spot.category === 'anchor') { icon = anchorIcon; label = "Sidrište"; }
 
-            let popupHtml = `<b>${spot.name}</b><br><small>${label}</small>`;
-            if (spot.image) {
-                popupHtml += `<br><img src="${spot.image}" style="width:100%; max-height:150px; border-radius:8px; margin-top:5px; object-fit:cover;">`;
-            }
-
-            L.marker(spot.coords, { icon: icon })
-                .bindPopup(popupHtml)
-                .addTo(fishingLayer);
-        });
-
-        // Find user pos or center
-        if (userMarker) {
-            alert(`Prikazuju se lokacije (Plaže, sidrišta, pošte). \n\nDugi klik na kartu za dodavanje nove pošte ručno!`);
+        let popupHtml = `<b>${spot.name}</b><br><small>${label}</small>`;
+        if (spot.image) {
+            popupHtml += `<br><img src="${spot.image}" style="width:100%; max-height:150px; border-radius:8px; margin-top:5px; object-fit:cover;">`;
         }
-    }
+
+        L.marker(spot.coords, { icon: icon })
+            .bindPopup(popupHtml)
+            .addTo(fishingLayer);
+    });
 }
 
 
@@ -749,12 +731,7 @@ window.editLocation = function (idx) {
         spots[idx].name = newName.trim();
         localStorage.setItem('sharksail_custom_spots', JSON.stringify(spots));
         renderLocationsList();
-
-        // Refresh markers if shown
-        if (state.mapMode === 'fishing') {
-            toggleFishingMode();
-            toggleFishingMode();
-        }
+        renderSavedLocations();
     }
 };
 
@@ -764,12 +741,7 @@ window.deleteLocation = function (idx) {
         spots.splice(idx, 1);
         localStorage.setItem('sharksail_custom_spots', JSON.stringify(spots));
         renderLocationsList();
-
-        // Refresh markers if shown
-        if (state.mapMode === 'fishing') {
-            toggleFishingMode();
-            toggleFishingMode();
-        }
+        renderSavedLocations();
     }
 };
 
@@ -852,11 +824,7 @@ function confirmSaveLocation() {
     DOM.locationModal.classList.remove('active');
     alert("Pozicija uspješno spremljena!");
 
-    // Refresh map markers if needed
-    if (state.mapMode === 'fishing') {
-        toggleFishingMode();
-        toggleFishingMode();
-    }
+    renderSavedLocations();
 }
 
 
@@ -873,7 +841,6 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.btnLocate.addEventListener('click', centerOnUser);
     DOM.btnStartTrip.addEventListener('click', toggleTrip);
     DOM.btnMeasure.addEventListener('click', toggleMeasureMode);
-    DOM.btnFishing.addEventListener('click', toggleFishingMode);
     DOM.btnLogbook.addEventListener('click', openLogbook);
     DOM.btnWeather.addEventListener('click', openWeather);
     DOM.btnLocationsList.addEventListener('click', openLocationsList);
