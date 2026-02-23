@@ -25,7 +25,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="stylesheet" href="styles.css?v=5">
+    <link rel="stylesheet" href="styles.css?v=6">
 </head>
 
 <body>
@@ -179,30 +179,7 @@
             </div>
         </div>
 
-        <!-- Weather Modal -->
-        <div class="modal-overlay" id="weather-modal">
-            <div class="modal-content l-width">
-                <div class="modal-header">
-                    <h2><i class="fa-solid fa-cloud-sun-rain"></i> Prognoza za pomorce</h2>
-                    <button class="close-btn" id="btn-close-weather"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-                <div class="modal-body iframe-container">
-                    <p class="meteo-note">DHMZ prognoze se otvaraju u novom prozoru radi potpune kompatibilnosti i
-                        sigurnosnih restrikcija.</p>
-                    <div class="external-links"
-                        style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
-                        <a href="https://meteo.hr/prognoze.php?section=prognoze_model&param=jadran_n" target="_blank"
-                            rel="noopener noreferrer" class="action-btn alt"
-                            style="text-align:center; padding: 15px;">Tekstualna Prognoza (Jadran) <i
-                                class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                        <a href="https://meteo.hr/prognoze.php?section=prognoze_model&param=aladin_vjetar"
-                            target="_blank" rel="noopener noreferrer" class="action-btn alt"
-                            style="text-align:center; padding: 15px;">ALADIN Karte Vjetra <i
-                                class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Locations List Modal -->
         <div class="modal-overlay" id="locations-list-modal">
@@ -280,7 +257,7 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
 
     <!-- PWA Service Worker Registration -->
     <script>

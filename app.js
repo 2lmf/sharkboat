@@ -45,14 +45,13 @@ const DOM = {
     btnFishing: document.getElementById('btn-fishing'),
     btnStartTrip: document.getElementById('btn-start-trip'),
 
-    // Logbook & Weather Modal
+    // Logbook Modal
     btnLogbook: document.getElementById('btn-logbook'),
     btnCloseLogbook: document.getElementById('btn-close-logbook'),
     logbookModal: document.getElementById('logbook-modal'),
 
+    // HRT Meteo 
     btnWeather: document.getElementById('btn-weather'),
-    btnCloseWeather: document.getElementById('btn-close-weather'),
-    weatherModal: document.getElementById('weather-modal'),
 
     // Locations List Modal
     btnLocationsList: document.getElementById('btn-locations-list'),
@@ -679,11 +678,19 @@ function closeLogbook() {
 }
 
 function openWeather() {
-    DOM.weatherModal.classList.add('active');
-}
+    // Attempt to open HRT Meteo app on Android
+    // The safest cross-platform web way is to try launching an intent or a fallback Play Store link.
+    // For iOS it's different, but assuming Android / standard intent.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-function closeWeather() {
-    DOM.weatherModal.classList.remove('active');
+    if (isIOS) {
+        window.open('https://apps.apple.com/hr/app/hrt-meteo/id1158097746', '_blank');
+    } else {
+        // Option A: Try to open Play Store link directly, Android will usually intercept it if app is installed
+        window.open('https://play.google.com/store/apps/details?id=hr.hrt.meteo', '_blank');
+
+        // Option B (Intent mapping): window.location.href = 'intent://#Intent;package=hr.hrt.meteo;scheme=https;end;'
+    }
 }
 
 // ===== LOCATIONS LIST LOGIC =====
@@ -876,7 +883,6 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.btnSaveFuel.addEventListener('click', saveFuelLog);
 
     DOM.btnCloseLogbook.addEventListener('click', closeLogbook);
-    DOM.btnCloseWeather.addEventListener('click', closeWeather);
     DOM.btnCloseLocationsList.addEventListener('click', closeLocationsList);
 
     DOM.btnSaveLoc.addEventListener('click', openLocationModal);
