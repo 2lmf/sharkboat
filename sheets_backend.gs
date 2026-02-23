@@ -37,21 +37,30 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
   }
 
-  if (action === 'logLocation') {
+  if (action === 'syncLocationsMaster') {
     try {
       var sheet = ss.getSheetByName('Lokacije');
       if(!sheet) sheet = ss.insertSheet('Lokacije');
-      if (sheet.getLastRow() === 0) {
-        sheet.appendRow(["ID", "Datum", "Naziv", "Kategorija", "Lat", "Lng"]);
+      
+      var dataStr = e.parameter.data;
+      if (!dataStr) {
+         return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "No data provided"})).setMimeType(ContentService.MimeType.JSON);
       }
-      sheet.appendRow([
-        e.parameter.id,
-        e.parameter.date,
-        e.parameter.name,
-        e.parameter.category,
-        e.parameter.lat,
-        e.parameter.lng
-      ]);
+      var spots = JSON.parse(dataStr);
+      
+      sheet.clear();
+      sheet.appendRow(["Naziv", "Kategorija", "Lat", "Lng"]);
+      
+      for(var i=0; i<spots.length; i++) {
+        var spot = spots[i];
+        sheet.appendRow([
+          spot.name,
+          spot.category || 'fishing',
+          spot.coords[0],
+          spot.coords[1]
+        ]);
+      }
+      
       return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": err.toString()})).setMimeType(ContentService.MimeType.JSON);

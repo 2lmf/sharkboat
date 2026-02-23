@@ -143,6 +143,33 @@ async function syncLocations() {
     }
 }
 
+// Master-Push from Phone to Cloud (Overwrites Sheets)
+function pushLocationsToSheets() {
+    if (!config.GAS_URL || config.GAS_URL.includes('VAŠ')) return;
+
+    const spots = getLogs('sharksail_custom_spots');
+
+    // Create lightweight version (no base64 images to prevent GAS payload limit errors)
+    const lightweightSpots = spots.map(s => ({
+        name: s.name,
+        category: s.category || 'fishing',
+        coords: s.coords
+    }));
+
+    const formData = new URLSearchParams({
+        action: 'syncLocationsMaster',
+        data: JSON.stringify(lightweightSpots)
+    });
+
+    console.log("Pushing master locations array to GAS...", lightweightSpots.length);
+    fetch(config.GAS_URL, {
+        method: 'POST',
+        body: formData,
+        mode: 'no-cors'
+    }).then(() => console.log("Master push dispatched (no-cors)."))
+        .catch(err => console.error("Error pushing master locations to Sheets:", err));
+}
+
 async function saveRouteLog(distanceNM, distanceKM, startTime) {
     if (distanceNM < 0.1) return; // Don't save empty/accidental trips
 
@@ -773,6 +800,7 @@ window.editLocation = function (idx) {
         localStorage.setItem('sharksail_custom_spots', JSON.stringify(spots));
         renderLocationsList();
         renderSavedLocations();
+        pushLocationsToSheets();
     }
 };
 
@@ -783,6 +811,7 @@ window.deleteLocation = function (idx) {
         localStorage.setItem('sharksail_custom_spots', JSON.stringify(spots));
         renderLocationsList();
         renderSavedLocations();
+        pushLocationsToSheets();
     }
 };
 
@@ -850,19 +879,7 @@ function confirmSaveLocation() {
     });
     localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
 
-    // POŠALJI NA GOOGLE SHEETS
-    if (config.GAS_URL && !config.GAS_URL.includes('VAŠ')) {
-        const formData = new URLSearchParams(locObj);
-        console.log("Slanje lokacije na GAS...", locObj);
-        fetch(config.GAS_URL, {
-            method: 'POST',
-            body: formData,
-            mode: 'no-cors'
-        }).then(() => console.log("Uspješno poslano na GAS (no-cors)."))
-            .catch(err => console.error("Error saving Location to Sheets:", err));
-    } else {
-        console.warn("GAS URL nije postavljen. Lokacija spremljena samo lokalno.");
-    }
+    pushLocationsToSheets();
 
     DOM.locationModal.classList.remove('active');
     alert("Pozicija uspješno spremljena!");
