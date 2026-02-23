@@ -732,6 +732,16 @@ function confirmSaveLocation() {
     const categoryEl = document.querySelector('input[name="loc-category"]:checked');
     const category = categoryEl ? categoryEl.value : 'fishing';
 
+    const locObj = {
+        action: 'logLocation',
+        id: Date.now(),
+        date: new Date().toLocaleDateString('hr-HR'),
+        name: name,
+        category: category,
+        lat: tempSavePos.lat.toFixed(5),
+        lng: tempSavePos.lng.toFixed(5)
+    };
+
     const currentSpots = getLogs('sharksail_custom_spots');
     currentSpots.push({
         name: name,
@@ -740,6 +750,18 @@ function confirmSaveLocation() {
         image: currentLocBase64
     });
     localStorage.setItem('sharksail_custom_spots', JSON.stringify(currentSpots));
+
+    // POŠALJI NA GOOGLE SHEETS
+    if (config.GAS_URL && !config.GAS_URL.includes('VAŠ')) {
+        const formData = new URLSearchParams(locObj);
+        fetch(config.GAS_URL, {
+            method: 'POST',
+            body: formData,
+            mode: 'no-cors'
+        }).catch(err => console.error("Error saving Location to Sheets:", err));
+    } else {
+        console.warn("GAS URL nije postavljen. Lokacija spremljena samo lokalno.");
+    }
 
     DOM.locationModal.classList.remove('active');
     alert("Pozicija uspješno spremljena!");

@@ -37,6 +37,23 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'logLocation') {
+    var sheet = ss.getSheetByName('Lokacije');
+    if(!sheet) sheet = ss.insertSheet('Lokacije');
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["ID", "Datum", "Naziv", "Kategorija", "Lat", "Lng"]);
+    }
+    sheet.appendRow([
+      e.parameter.id,
+      e.parameter.date,
+      e.parameter.name,
+      e.parameter.category,
+      e.parameter.lat,
+      e.parameter.lng
+    ]);
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
 }
 
