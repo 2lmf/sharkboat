@@ -14,7 +14,8 @@ const state = {
     },
     gps: {
         watchId: null,
-        connected: false
+        connected: false,
+        lastAcceptedPosition: null
     },
     mapMode: 'navigate', // 'navigate', 'measure', 'fishing'
     measurePoints: []
@@ -390,46 +391,65 @@ function initGPS() {
             const rawSpeed = position.coords.speed; // meters/second, can be null
             const heading = position.coords.heading; // 0-360, can be null
 
-            // Speed smoothing calculations
+            const currentPos = L.latLng(lat, lng);
+
+            // 1. DEADBAND FILTER (2 metra) - Sprječava "skakanje" brzine na semaforu
+            let isStationary = false;
+            if (state.gps.lastAcceptedPosition) {
+                const distSinceLastAccepted = state.gps.lastAcceptedPosition.distanceTo(currentPos);
+                if (distSinceLastAccepted < 2.0) {
+                    isStationary = true;
+                } else {
+                    state.gps.lastAcceptedPosition = currentPos;
+                }
+            } else {
+                state.gps.lastAcceptedPosition = currentPos;
+            }
+
+            // 2. Speed smoothing calculations
             let avgSpeed = null;
             if (rawSpeed !== null) {
-                // Keep all readings in history to smooth out sudden hardware spikes
-                speedHistory.push(rawSpeed);
+                if (isStationary) {
+                    speedHistory.push(0); // Ako stojimo, forsira 0 u matematici
+                } else {
+                    speedHistory.push(rawSpeed);
+                }
+
                 if (speedHistory.length > 6) speedHistory.shift(); // 6-second rolling window
 
                 avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
 
-                // If the smoothed speed is less than 1m/s (~2 knots), map to 0
-                if (avgSpeed < 1.0) {
+                // Donji prag: sve ispod 0.5 m/s (~1 čvor) je previše sporo za očitavanje (vjerojatno valjanje na sidru)
+                if (avgSpeed < 0.5) {
                     avgSpeed = 0;
                 }
             }
 
-            const currentPos = L.latLng(lat, lng);
-
-            // Update Maker
+            // 3. Update Maker
             if (!userMarker) {
                 userMarker = L.marker([lat, lng], { icon: boatIcon }).addTo(map);
                 map.setView([lat, lng], 14); // Initial zoom to user
-            } else {
-                userMarker.setLatLng([lat, lng]);
+            } else if (!isStationary) {
+                userMarker.setLatLng([lat, lng]); // Marker stoji na mjestu ako je razlika ispod 2 metra
             }
 
-            // Update Route & Distance if Trip is Active
-            if (state.trip.active) {
-                if (state.trip.lastPosition) {
-                    const distMeters = state.trip.lastPosition.distanceTo(currentPos);
-                    // Filter unrealistic jumps (e.g. > 1km in a second)
-                    if (distMeters < 1000) {
-                        state.trip.distanceNM += (distMeters * CONV.meters_to_nm);
-                        state.trip.distanceKM += (distMeters * CONV.meters_to_km);
-                        routeCoordinates.push([lat, lng]);
-                        routeLine.setLatLngs(routeCoordinates);
+            // 4. Update Route & Distance if Trip is Active
+            if (!isStationary) {
+                if (state.trip.active) {
+                    if (state.trip.lastPosition) {
+                        const distMeters = state.trip.lastPosition.distanceTo(currentPos);
+                        // Filter unrealistic jumps (e.g. > 1km in a second)
+                        if (distMeters < 1000) {
+                            state.trip.distanceNM += (distMeters * CONV.meters_to_nm);
+                            state.trip.distanceKM += (distMeters * CONV.meters_to_km);
+                            routeCoordinates.push([lat, lng]);
+                            routeLine.setLatLngs(routeCoordinates);
+                        }
                     }
+                    state.trip.lastPosition = currentPos;
+                } else {
+                    state.trip.lastPosition = currentPos; // keep track even if not 'recording' trip
                 }
-                state.trip.lastPosition = currentPos;
-            } else {
-                state.trip.lastPosition = currentPos; // keep track even if not 'recording' trip
             }
 
             updateTelemetryDisplay(avgSpeed);
