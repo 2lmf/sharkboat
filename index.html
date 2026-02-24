@@ -25,7 +25,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=16">
 </head>
 
 <body>
@@ -254,14 +254,48 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration & Force Update -->
     <script>
+        const CURRENT_VERSION = 'v16'; // Manual override trigger
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registriran', reg))
+                    .then(reg => {
+                        console.log('Service Worker registriran', reg);
+
+                        // Agresivno prisilno ažuriranje ako otkrijemo novu verziju koda
+                        let lastVersion = localStorage.getItem('sharksail_version');
+                        if (lastVersion !== CURRENT_VERSION) {
+                            console.log("Nova verzija detektirana. Brisanje stare predmemorije i aktivacija nove...");
+
+                            // 1. Odjavi sve postojeće service workere
+                            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                                for (let registration of registrations) {
+                                    registration.unregister();
+                                }
+                            });
+
+                            // 2. Očisti sve Cache objekte
+                            if ('caches' in window) {
+                                caches.keys().then(function (names) {
+                                    for (let name of names) {
+                                        caches.delete(name);
+                                    }
+                                });
+                            }
+
+                            // 3. Zabilježi novu verziju
+                            localStorage.setItem('sharksail_version', CURRENT_VERSION);
+
+                            // 4. Prisilno osvježi stranicu iz baze (bypass cache)
+                            setTimeout(() => {
+                                window.location.reload(true);
+                            }, 1000);
+                        }
+                    })
                     .catch(err => console.error('Service Worker greška:', err));
             });
         }
