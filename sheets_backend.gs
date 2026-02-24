@@ -49,11 +49,14 @@ function doPost(e) {
       var spots = JSON.parse(dataStr);
       
       sheet.clear();
-      sheet.appendRow(["Naziv", "Kategorija", "Lat", "Lng"]);
+      sheet.appendRow(["ID", "Datum", "Naziv", "Kategorija", "Lat", "Lng"]);
       
+      var now = new Date().toLocaleDateString('hr-HR');
       for(var i=0; i<spots.length; i++) {
         var spot = spots[i];
         sheet.appendRow([
+          Date.now() + i,
+          now,
           spot.name,
           spot.category || 'fishing',
           spot.coords[0],

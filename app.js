@@ -79,7 +79,23 @@ const lsKeys = {
 
 function getLogs(key) {
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    try {
+        let arr = JSON.parse(data);
+        // Fix corrupted locations with NaN coordinates that crash Leaflet
+        if (key === 'sharksail_custom_spots') {
+            const originalLength = arr.length;
+            arr = arr.filter(spot => spot && spot.coords && typeof spot.coords[0] === 'number' && typeof spot.coords[1] === 'number' && !isNaN(spot.coords[0]) && !isNaN(spot.coords[1]));
+            if (arr.length !== originalLength) {
+                localStorage.setItem(key, JSON.stringify(arr));
+                console.warn("Cleaned up corrupted coordinates in localStorage.");
+            }
+        }
+        return arr;
+    } catch (e) {
+        console.error("Error parsing logs", e);
+        return [];
+    }
 }
 const config = {
     // KORISNIK: Upišite ovdje Web App URL od vašeg objavljenog Google Apps Script-a
@@ -113,17 +129,23 @@ async function syncLocations() {
         let updated = false;
 
         serverSpots.forEach(s => {
+            const lat = parseFloat(s.lat);
+            const lng = parseFloat(s.lng);
+
+            // Preskoči korumpirane ili prazne podatke s weba
+            if (isNaN(lat) || isNaN(lng)) return;
+
             const exists = localSpots.find(l =>
                 l.name === s.name &&
-                Math.abs(l.coords[0] - parseFloat(s.lat)) < 0.001 &&
-                Math.abs(l.coords[1] - parseFloat(s.lng)) < 0.001
+                Math.abs(l.coords[0] - lat) < 0.001 &&
+                Math.abs(l.coords[1] - lng) < 0.001
             );
 
             if (!exists) {
                 localSpots.push({
                     name: s.name,
                     category: s.category || 'fishing',
-                    coords: [parseFloat(s.lat), parseFloat(s.lng)],
+                    coords: [lat, lng],
                     image: null
                 });
                 updated = true;
@@ -132,6 +154,8 @@ async function syncLocations() {
 
         if (updated) {
             localStorage.setItem('sharksail_custom_spots', JSON.stringify(localSpots));
+            // Ponovno guramo na cloud ispravan format kako bi se tablica automatski popravila
+            pushLocationsToSheets();
             renderSavedLocations();
             const listEl = document.getElementById('custom-locations-list');
             if (listEl && listEl.innerHTML !== '') {
