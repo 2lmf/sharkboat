@@ -752,17 +752,22 @@ function closeLogbook() {
 }
 
 function openWeather() {
-    // Attempt to open HRT Meteo app on Android
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     if (isIOS) {
         window.open('https://apps.apple.com/hr/app/hrt-meteo/id1158097746', '_blank');
     } else {
-        // Robust Android Intent for HRT Meteo app
-        // This forces Android to look for the package 'hr.hrt.meteo'
-        // If it's not installed, it falls back to the Play Store link provided in S.browser_fallback_url
-        const intentUrl = 'intent://#Intent;package=hr.hrt.meteo;scheme=https;S.browser_fallback_url=https://play.google.com/store/apps/details?id=hr.hrt.meteo;end;';
-        window.location.href = intentUrl;
+        // Explicit Launcher Intent (acts exactly like tapping the app icon)
+        // This overcomes issues where the app hasn't registered 'https' URL schemes.
+        const intentUrl = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10000000;package=hr.hrt.meteo;S.browser_fallback_url=https://play.google.com/store/apps/details?id=hr.hrt.meteo;end;';
+
+        // PWA/Chrome workaround: Creating a temporary anchor tag sometimes works better than window.location
+        const a = document.createElement('a');
+        a.href = intentUrl;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 }
 
