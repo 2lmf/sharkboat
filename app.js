@@ -393,14 +393,15 @@ function initGPS() {
             // Speed smoothing calculations
             let avgSpeed = null;
             if (rawSpeed !== null) {
-                // Ignore micro speeds < 1m/s (~2 knots) when standing still / drifting slightly
-                if (rawSpeed < 1.0) {
+                // Keep all readings in history to smooth out sudden hardware spikes
+                speedHistory.push(rawSpeed);
+                if (speedHistory.length > 6) speedHistory.shift(); // 6-second rolling window
+
+                avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
+
+                // If the smoothed speed is less than 1m/s (~2 knots), map to 0
+                if (avgSpeed < 1.0) {
                     avgSpeed = 0;
-                    speedHistory = []; // Reset history
-                } else {
-                    speedHistory.push(rawSpeed);
-                    if (speedHistory.length > 4) speedHistory.shift(); // Keep last 4 readings
-                    avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
                 }
             }
 
@@ -750,24 +751,19 @@ function openLogbook() {
 function closeLogbook() {
     DOM.logbookModal.classList.remove('active');
 }
-
 function openWeather() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     if (isIOS) {
         window.open('https://apps.apple.com/hr/app/hrt-meteo/id1158097746', '_blank');
     } else {
-        // Explicit Launcher Intent (acts exactly like tapping the app icon)
-        // This overcomes issues where the app hasn't registered 'https' URL schemes.
-        const intentUrl = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10000000;package=hr.hrt.meteo;S.browser_fallback_url=https://play.google.com/store/apps/details?id=hr.hrt.meteo;end;';
+        // Universal simplest package intent
+        window.location.href = 'intent://#Intent;package=hr.hrt.meteo;end;';
 
-        // PWA/Chrome workaround: Creating a temporary anchor tag sometimes works better than window.location
-        const a = document.createElement('a');
-        a.href = intentUrl;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Fallback directly to native Play Store app if the intent fails to resolve
+        setTimeout(() => {
+            window.location.href = 'market://details?id=hr.hrt.meteo';
+        }, 1500);
     }
 }
 
