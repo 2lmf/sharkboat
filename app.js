@@ -752,27 +752,7 @@ function closeLogbook() {
     DOM.logbookModal.classList.remove('active');
 }
 function openWeather() {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-    if (isIOS) {
-        window.open('https://apps.apple.com/hr/app/hrt-meteo/id1158097746', '_blank');
-    } else {
-        // The most robust PWA bypass: Use a hidden iframe to try the intent.
-        // If the app exists, the iframe successfully hands off to the OS.
-        // If it doesn't, the iframe fails silently, and our timeout redirects the main window to the store.
-        const appIntent = 'intent://#Intent;package=hr.hrt.meteo;scheme=https;end;';
-
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = appIntent;
-        document.body.appendChild(iframe);
-
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-            // Fallback to market link in the main window
-            window.location.href = 'market://details?id=hr.hrt.meteo';
-        }, 1500);
-    }
+    window.open('https://meteo.hr/', '_blank');
 }
 
 // ===== LOCATIONS LIST LOGIC =====
