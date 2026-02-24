@@ -753,17 +753,16 @@ function closeLogbook() {
 
 function openWeather() {
     // Attempt to open HRT Meteo app on Android
-    // The safest cross-platform web way is to try launching an intent or a fallback Play Store link.
-    // For iOS it's different, but assuming Android / standard intent.
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     if (isIOS) {
         window.open('https://apps.apple.com/hr/app/hrt-meteo/id1158097746', '_blank');
     } else {
-        // Option A: Try to open Play Store link directly, Android will usually intercept it if app is installed
-        window.open('https://play.google.com/store/apps/details?id=hr.hrt.meteo', '_blank');
-
-        // Option B (Intent mapping): window.location.href = 'intent://#Intent;package=hr.hrt.meteo;scheme=https;end;'
+        // Robust Android Intent for HRT Meteo app
+        // This forces Android to look for the package 'hr.hrt.meteo'
+        // If it's not installed, it falls back to the Play Store link provided in S.browser_fallback_url
+        const intentUrl = 'intent://#Intent;package=hr.hrt.meteo;scheme=https;S.browser_fallback_url=https://play.google.com/store/apps/details?id=hr.hrt.meteo;end;';
+        window.location.href = intentUrl;
     }
 }
 
