@@ -156,6 +156,20 @@
                 </div>
             </div>
         </div>
+
+        <!-- Weather Modal (v1.1) -->
+        <div class="modal-overlay" id="weather-modal">
+            <div class="modal-content glass-effect">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-cloud-sun-rain"></i> Nautička Prognoza</h2>
+                    <button class="close-btn" onclick="closeWeather()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="weather-content" class="modal-body">
+                    <!-- Loaded via JS -->
+                </div>
+            </div>
+        </div>
+
         <!-- Logbook Modal -->
         <div class="modal-overlay" id="logbook-modal">
             <div class="modal-content l-width">
@@ -258,7 +272,7 @@
 
     <!-- PWA Service Worker Registration & Force Update -->
     <script>
-        const CURRENT_VERSION = 'v17'; // Manual override trigger
+        const CURRENT_VERSION = 'v18'; // Manual override trigger
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

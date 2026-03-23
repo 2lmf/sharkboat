@@ -397,7 +397,7 @@ function initGPS() {
             let isStationary = false;
             if (state.gps.lastAcceptedPosition) {
                 const distSinceLastAccepted = state.gps.lastAcceptedPosition.distanceTo(currentPos);
-                if (distSinceLastAccepted < 2.0) {
+                if (distSinceLastAccepted < 1.0) { // Reduced deadband from 2.0 to 1.0 for snappier updates
                     isStationary = true;
                 } else {
                     state.gps.lastAcceptedPosition = currentPos;
@@ -415,7 +415,7 @@ function initGPS() {
                     speedHistory.push(rawSpeed);
                 }
 
-                if (speedHistory.length > 6) speedHistory.shift(); // 6-second rolling window
+                if (speedHistory.length > 3) speedHistory.shift(); // 3-second rolling window for faster boat response
 
                 avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
 
@@ -771,8 +771,99 @@ function openLogbook() {
 function closeLogbook() {
     DOM.logbookModal.classList.remove('active');
 }
-function openWeather() {
-    window.open('https://meteo.hr/', '_blank');
+async function openWeather() {
+    const modal = document.getElementById('weather-modal');
+    const content = document.getElementById('weather-content');
+    if (!modal || !content) {
+        window.open('https://meteo.hr/', '_blank');
+        return;
+    }
+
+    modal.classList.add('active');
+    content.innerHTML = '<div class="loading-spinner"><i class="fas fa-circle-notch fa-spin"></i> Učitavanje nautičke prognoze...</div>';
+
+    // Get position for weather
+    let lat = 43.5, lng = 15.5; // Default Adriatic
+    if (userMarker) {
+        lat = userMarker.getLatLng().lat;
+        lng = userMarker.getLatLng().lng;
+    }
+
+    try {
+        const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}&current=wave_height,wave_direction,wave_period&hourly=wave_height&timezone=auto`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // Also get wind and temp from standard weather
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code&timezone=auto`;
+        const wRes = await fetch(weatherUrl);
+        const wData = await wRes.json();
+
+        renderWeather(data, wData);
+    } catch (e) {
+        content.innerHTML = '<div class="error">Greška pri dohvaćanju podataka. Molimo provjerite vezu.</div>';
+    }
+}
+
+function renderWeather(marine, weather) {
+    const content = document.getElementById('weather-content');
+    const curM = marine.current;
+    const curW = weather.current;
+
+    // Translate wave height to descriptive text
+    let waveDesc = "Mirno more";
+    if (curM.wave_height > 0.2) waveDesc = "Mali valovi";
+    if (curM.wave_height > 0.5) waveDesc = "Umjereno valovito";
+    if (curM.wave_height > 1.2) waveDesc = "Jako valovito - Oprez!";
+
+    // Wind direction arrow logic
+    const windRot = curW.wind_direction_10m;
+    const waveRot = curM.wave_direction;
+
+    content.innerHTML = `
+        <div class="weather-grid">
+            <div class="weather-card main">
+                <i class="fas ${getWeatherIcon(curW.weather_code)} weather-main-icon"></i>
+                <div class="temp-large">${curW.temperature_2m}°C</div>
+                <div class="weather-desc">${waveDesc}</div>
+            </div>
+            
+            <div class="weather-card">
+                <div class="w-label">VALOVI</div>
+                <div class="w-val">🌊 ${curM.wave_height} m</div>
+                <div class="w-dir" style="transform: rotate(${waveRot}deg);"><i class="fas fa-long-arrow-alt-up"></i></div>
+            </div>
+
+            <div class="weather-card">
+                <div class="w-label">VJETAR</div>
+                <div class="w-val">💨 ${curW.wind_speed_10m} km/h</div>
+                <div class="w-dir" style="transform: rotate(${windRot}deg);"><i class="fas fa-long-arrow-alt-up"></i></div>
+            </div>
+            
+            <div class="weather-card info">
+                <div class="w-label">PERIOD VALA</div>
+                <div class="w-val">⏱️ ${curM.wave_period} s</div>
+            </div>
+            
+            <div class="weather-card info">
+                <div class="w-label">LOKACIJA</div>
+                <div class="w-val"><i class="fas fa-map-marker-alt"></i> ${weather.latitude.toFixed(2)}, ${weather.longitude.toFixed(2)}</div>
+            </div>
+        </div>
+        <p style="font-size:0.7rem; color:var(--text-secondary); margin-top:15px; text-align:center;">Podaci: Open-Meteo.com Marine API</p>
+    `;
+}
+
+function getWeatherIcon(code) {
+    if (code <= 1) return 'fa-sun';
+    if (code <= 3) return 'fa-cloud-sun';
+    if (code <= 48) return 'fa-cloud';
+    if (code <= 67) return 'fa-cloud-showers-heavy';
+    return 'fa-bolt';
+}
+
+function closeWeather() {
+    document.getElementById('weather-modal').classList.remove('active');
 }
 
 // ===== LOCATIONS LIST LOGIC =====
