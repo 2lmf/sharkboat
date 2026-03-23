@@ -513,22 +513,30 @@ function toggleTrip() {
 function handleMapClick(e) {
     if (state.mapMode === 'measure') {
         const latlng = e.latlng;
-
-        if (state.measurePoints.length === 2) {
-            // Reset measure tool
-            state.measurePoints = [];
-            if (measureLine) map.removeLayer(measureLine);
-            measureMarkers.forEach(m => map.removeLayer(m));
-            measureMarkers = [];
-        }
-
         state.measurePoints.push(latlng);
 
-        const marker = L.marker(latlng).addTo(map);
+        // Koristimo male krugove za točke mjerenja
+        const marker = L.circleMarker(latlng, { radius: 5, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(map);
         measureMarkers.push(marker);
 
-        if (state.measurePoints.length === 2) {
-            calculateSeaRoute(state.measurePoints[0], state.measurePoints[1]);
+        if (state.measurePoints.length > 1) {
+            if (measureLine) map.removeLayer(measureLine);
+            // Crtamo liniju kroz sve točke
+            measureLine = L.polyline(state.measurePoints, { color: '#ef4444', weight: 4, dashArray: '5, 10' }).addTo(map);
+
+            // Izračun ukupne udaljenosti kroz sve segmente
+            let totalDistM = 0;
+            for (let i = 1; i < state.measurePoints.length; i++) {
+                totalDistM += state.measurePoints[i - 1].distanceTo(state.measurePoints[i]);
+            }
+            const distNM = (totalDistM * CONV.meters_to_nm).toFixed(2);
+            const distKM = (totalDistM * CONV.meters_to_km).toFixed(2);
+
+            // Prikazujemo ukupnu udaljenost na zadnjoj točki
+            L.popup()
+                .setLatLng(latlng)
+                .setContent(`<b>Ukupna ruta:</b><br>${distNM} NM<br><small>${distKM} km</small>`)
+                .openOn(map);
         }
     }
 }

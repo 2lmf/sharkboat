@@ -401,6 +401,7 @@ html {
     align-items: center;
     padding: 1.25rem 1.5rem;
     border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
 }
 
 .modal-content.l-width {
@@ -638,7 +639,7 @@ html {
 
 .glass-effect {
     backdrop-filter: blur(25px) saturate(150%);
-    background: rgba(2, 2, 5, 0.85) !important;
+    background: var(--bg-panel) !important;
 }
 
 .loading-spinner {
