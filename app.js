@@ -15,7 +15,8 @@ const state = {
     gps: {
         watchId: null,
         connected: false,
-        lastAcceptedPosition: null
+        lastAcceptedPosition: null,
+        wakeLock: null
     },
     mapMode: 'navigate', // 'navigate', 'measure', 'fishing'
     measurePoints: []
@@ -477,7 +478,35 @@ function centerOnUser() {
     }
 }
 
-function toggleTrip() {
+async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+        try {
+            state.gps.wakeLock = await navigator.wakeLock.request('screen');
+            console.log('Screen Wake Lock active');
+        } catch (err) {
+            console.warn(`Wake Lock Error: ${err.message}`);
+        }
+    }
+}
+
+function releaseWakeLock() {
+    if (state.gps.wakeLock) {
+        state.gps.wakeLock.release()
+            .then(() => {
+                state.gps.wakeLock = null;
+                console.log('Screen Wake Lock released');
+            });
+    }
+}
+
+// Re-request wake lock if tab becomes visible again and trip is active
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && state.trip.active) {
+        await requestWakeLock();
+    }
+});
+
+async function toggleTrip() {
     state.trip.active = !state.trip.active;
     if (state.trip.active) {
         DOM.btnStartTrip.innerHTML = `<i class="fa-solid fa-stop"></i> STOP ROUTE`;
@@ -492,11 +521,18 @@ function toggleTrip() {
             routeCoordinates.push([state.trip.lastPosition.lat, state.trip.lastPosition.lng]);
         }
         routeLine.setLatLngs(routeCoordinates);
+
+        // Keep screen awake while tracking
+        await requestWakeLock();
+
         alert("Ruta započeta!");
     } else {
         DOM.btnStartTrip.innerHTML = `<i class="fa-solid fa-play"></i> START ROUTE`;
         DOM.btnStartTrip.style.backgroundColor = '';
         DOM.btnStartTrip.style.color = '';
+
+        // Let screen sleep again
+        releaseWakeLock();
 
         // Save the route if it has distance
         if (state.trip.distanceNM > 0.1) {
